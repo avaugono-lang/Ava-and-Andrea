@@ -5,7 +5,7 @@ import test from 'node:test';
 import { createApp } from '../server/createApp.ts';
 
 async function start() {
-  const app = createApp({
+  const app = await createApp({
     dbPath: `data/test-${Date.now()}-${Math.random()}.json`,
     webhookSecret: 'test-secret',
     devMatch: false,

@@ -95,7 +95,7 @@ export interface NotificationRecord {
   createdAt: string;
 }
 
-interface DatabaseShape {
+export interface DatabaseShape {
   users: UserRecord[];
   clubs: ClubRecord[];
   payments: PaymentRecord[];
@@ -113,7 +113,7 @@ const CITY_COORDS: Record<string, [number, number]> = {
   abuja: [9.0765, 7.3986],
 };
 
-function emptyDb(): DatabaseShape {
+export function emptyDb(): DatabaseShape {
   return {
     users: [],
     clubs: [],
@@ -176,10 +176,15 @@ export function openStore(filePath: string) {
   const db: DatabaseShape = fs.existsSync(filePath)
     ? { ...emptyDb(), ...JSON.parse(fs.readFileSync(filePath, 'utf8')) }
     : emptyDb();
-
-  function save() {
+  return createBoundStore(db, async (snapshot) => {
     fs.mkdirSync(path.dirname(filePath), { recursive: true });
-    fs.writeFileSync(filePath, JSON.stringify(db));
+    fs.writeFileSync(filePath, JSON.stringify(snapshot));
+  });
+}
+
+export function createBoundStore(db: DatabaseShape, persist: (snapshot: DatabaseShape) => Promise<void>) {
+  async function save() {
+    await persist(db);
   }
 
   function publicUser(user: UserRecord) {
@@ -203,10 +208,10 @@ export function openStore(filePath: string) {
     };
   }
 
-  function issueToken(userId: string) {
+  async function issueToken(userId: string) {
     const token = randomBytes(24).toString('hex');
     db.tokens.push({ hash: tokenHash(token), userId });
-    save();
+    await save();
     return token;
   }
 
@@ -229,7 +234,7 @@ export function openStore(filePath: string) {
     };
   }
 
-  function createPendingStudents(
+  async function createPendingStudents(
     students: { name: string; email: string; password: string; phone?: string; level?: number; dateOfBirth?: string }[],
     clubId: string | null,
   ) {
@@ -268,7 +273,7 @@ export function openStore(filePath: string) {
       clubId,
     };
     db.payments.push(payment);
-    save();
+    await save();
     return { payment: paymentView(payment), students: created.map(publicUser) };
   }
 
@@ -318,7 +323,7 @@ export function openStore(filePath: string) {
   }
 
   return {
-    registerClub(input: { clubName: string; city: string; adminName: string; email: string; password: string; phone?: string }) {
+    async registerClub(input: { clubName: string; city: string; adminName: string; email: string; password: string; phone?: string }) {
       const email = input.email.trim().toLowerCase();
       if (db.users.some((item) => item.email === email)) throw new Error('EMAIL_TAKEN');
       const club: ClubRecord = {
@@ -348,24 +353,24 @@ export function openStore(filePath: string) {
       club.adminUserId = admin.id;
       db.clubs.push(club);
       db.users.push(admin);
-      save();
-      return { token: issueToken(admin.id), user: publicUser(admin), club };
+      await save();
+      return { token: await issueToken(admin.id), user: publicUser(admin), club };
     },
 
-    signupStudent(input: { name: string; email: string; password: string; phone?: string; level?: number; dateOfBirth?: string }) {
+    async signupStudent(input: { name: string; email: string; password: string; phone?: string; level?: number; dateOfBirth?: string }) {
       return createPendingStudents([input], null);
     },
 
-    signupClubStudents(
+    async signupClubStudents(
       admin: UserRecord,
       students: { name: string; email: string; password: string; phone?: string; level?: number; dateOfBirth?: string }[],
     ) {
       if (admin.role !== 'CLUB_ADMIN' || !admin.clubId) throw new Error('FORBIDDEN');
       if (students.length === 0) throw new Error('EMPTY');
-      return createPendingStudents(students, admin.clubId);
+      return await createPendingStudents(students, admin.clubId);
     },
 
-    matchPayment(reference: string, amount: number, transferId: string) {
+    async matchPayment(reference: string, amount: number, transferId: string) {
       const payment = db.payments.find((item) => item.reference === reference);
       if (!payment) throw new Error('NOT_FOUND');
       if (payment.status === 'paid') return { alreadyPaid: true, payment: paymentView(payment) };
@@ -381,37 +386,37 @@ export function openStore(filePath: string) {
         student.periodEnd = periodEnd;
         if (payment.clubId) student.clubId = payment.clubId;
       }
-      save();
+      await save();
       return { alreadyPaid: false, payment: paymentView(payment) };
     },
 
-    allocatePaidStudent(admin: UserRecord, studentId: string) {
+    async allocatePaidStudent(admin: UserRecord, studentId: string) {
       if (admin.role !== 'CLUB_ADMIN' || !admin.clubId) throw new Error('FORBIDDEN');
       const student = db.users.find((item) => item.id === studentId);
       if (!student || student.status !== 'active') throw new Error('NOT_ACTIVE');
       student.clubId = admin.clubId;
-      save();
+      await save();
       return publicUser(student);
     },
 
-    login(email: string, password: string) {
+    async login(email: string, password: string) {
       const user = db.users.find((item) => item.email === email.trim().toLowerCase());
       if (!user || !verifyPassword(password, user.passwordHash)) throw new Error('INVALID');
       if (user.status !== 'active') {
         const payment = db.payments.find((item) => item.status === 'pending' && item.studentIds.includes(user.id));
         throw Object.assign(new Error('PAYMENT_REQUIRED'), { payment: payment ? paymentView(payment) : null });
       }
-      return { token: issueToken(user.id), user: publicUser(user) };
+      return { token: await issueToken(user.id), user: publicUser(user) };
     },
 
     userByToken,
     publicUser,
 
-    acceptParent(studentId: string, parentEmail: string) {
+    async acceptParent(studentId: string, parentEmail: string) {
       const student = db.users.find((item) => item.id === studentId);
       if (!student) throw new Error('NOT_FOUND');
       student.parentAccepted = true;
-      save();
+      await save();
       return { parentEmail, student: publicUser(student) };
     },
 
@@ -465,7 +470,7 @@ export function openStore(filePath: string) {
       return rows;
     },
 
-    createPost(
+    async createPost(
       author: UserRecord,
       input: {
         videoUrl: string;
@@ -502,7 +507,7 @@ export function openStore(filePath: string) {
       db.posts.unshift(post);
       const followers = db.follows.filter((item) => item.targetUserId === author.id);
       for (const follow of followers) notify(follow.followerId, 'upload', author.id, post.id);
-      save();
+      await save();
       return presentPost(post, author);
     },
 
@@ -513,18 +518,18 @@ export function openStore(filePath: string) {
         .map((post) => presentPost(post, viewer));
     },
 
-    like(user: UserRecord, postId: string) {
+    async like(user: UserRecord, postId: string) {
       const post = db.posts.find((item) => item.id === postId);
       if (!post || !canSeePost(user, post)) throw new Error('NOT_FOUND');
       if (!db.likes.some((item) => item.postId === postId && item.userId === user.id)) {
         db.likes.push({ postId, userId: user.id });
         notify(post.authorId, 'like', user.id, postId);
-        save();
+        await save();
       }
       return presentPost(post, user);
     },
 
-    comment(user: UserRecord, postId: string, text: string, parentCommentId: string | null) {
+    async comment(user: UserRecord, postId: string, text: string, parentCommentId: string | null) {
       const post = db.posts.find((item) => item.id === postId);
       if (!post || !canSeePost(user, post)) throw new Error('NOT_FOUND');
       const comment: CommentRecord = {
@@ -543,16 +548,16 @@ export function openStore(filePath: string) {
       } else {
         notify(post.authorId, 'comment', user.id, postId);
       }
-      save();
+      await save();
       return presentPost(post, user);
     },
 
-    savePost(user: UserRecord, postId: string) {
+    async savePost(user: UserRecord, postId: string) {
       const post = db.posts.find((item) => item.id === postId);
       if (!post || !canSeePost(user, post)) throw new Error('NOT_FOUND');
       if (!db.saves.some((item) => item.postId === postId && item.userId === user.id)) {
         db.saves.push({ postId, userId: user.id });
-        save();
+        await save();
       }
       return presentPost(post, user);
     },
@@ -562,7 +567,7 @@ export function openStore(filePath: string) {
       return db.posts.filter((post) => ids.has(post.id)).map((post) => presentPost(post, user));
     },
 
-    follow(user: UserRecord, target: { userId?: string; clubId?: string }) {
+    async follow(user: UserRecord, target: { userId?: string; clubId?: string }) {
       if (!target.userId && !target.clubId) throw new Error('EMPTY');
       const exists = db.follows.some(
         (item) =>
@@ -573,7 +578,7 @@ export function openStore(filePath: string) {
       if (!exists) {
         db.follows.push({ followerId: user.id, targetUserId: target.userId, targetClubId: target.clubId });
         if (target.userId) notify(target.userId, 'follow', user.id, null);
-        save();
+        await save();
       }
       return { ok: true };
     },

@@ -6,8 +6,9 @@ import { createApp } from './server/createApp.ts';
 
 dotenv.config();
 
-const app = createApp();
-const PORT = 3000;
+const app = express();
+app.use(express.json({ limit: '1mb' }));
+const PORT = Number(process.env.PORT) || 3000;
 
 // In-memory cache for search results to preserve API quotas and provide lightning speed
 const searchCache = new Map<string, any>();
@@ -471,6 +472,7 @@ app.post('/api/youtube/batch', async (req: Request, res: Response) => {
 });
 
 async function startServer() {
+  app.use(await createApp());
   // Vite middleware in dev mode
   if (process.env.NODE_ENV !== 'production') {
     const vite = await createViteServer({
