@@ -2,7 +2,7 @@
 
 **Goal:** Take GymTrack from the current browser demo to a product a gymnastics club will pay for, with a web app for the office and iOS and Android apps for gymnasts, parents, and coaches.
 
-**Buyer:** the club, billed monthly. Gymnasts and parents do not pay us. They use the club’s subscription.
+**Buyer:** the club, billed monthly at ₦1,000 per active student. Gymnasts and parents do not pay us. They use the club’s subscription.
 
 **Repo today:** `avaugono-lang/Ava-and-Andrea`, public, write access for `uvieugono`. Local checkout: `C:\Users\pc\src\Ava-and-Andrea`. This file is the plan. It is not an implementation, and it is not committed.
 
@@ -14,30 +14,24 @@
 
 1. **First market is Nigerian clubs.** The seed data is already Lagos and Abuja clubs, naira, and `+234` phones. Clubs pay by bank transfer in NGN. Privacy duties follow the Nigeria Data Protection Act. A US launch (Stripe, COPPA, USA Gymnastics trademark care) is a later market, not this release.
 2. **GymTrack is its own SolyntaFlow company, and club payments land in its Spend Management wallet.** SolyntaFlow has one Spend Management wallet per company (`CompanyWallet` on a tenant). A marketplace vendor account is a different wallet and is not used. Create a GymTrack tenant, then provision its wallet and NUBAN with `setup_company_nuban`. Inbound transfers to that NUBAN credit `CompanyWallet.balance` after the ₦200 inbound fee. The Solynta Academy Flutterwave business is not used, and Academy fee income is not credited.
-3. **The father operates that wallet.** The product owners are under 18, so they do not get a SolyntaFlow login that can approve a payout, and they do not enroll as the Apple or Google seller. The wallet’s Anchor account is created under the existing SolyntaFlow Anchor customer. Payouts are Spend Requests to a bank account the father controls. The Spend Management page has no Withdraw button. A payout leaves only after approval, and only if the shared Anchor float can cover it. A balance on the wallet screen is not a separate pile of cash.
+3. **The mother operates the Spend Management wallet.** She is the only SolyntaFlow user who can approve a payout, and the payout goes to a bank account she controls. The children do not get a login that can move money, and they do not enroll as the Apple or Google seller. The father still opens those store accounts, because the sellers must be adults. The wallet’s Anchor account is created under the existing SolyntaFlow Anchor customer. The Spend Management page has no Withdraw button. A payout leaves only after her approval, and only if the shared Anchor float can cover it. A balance on the wallet screen is not a separate pile of cash.
 4. **One gymnastics club is one GymTrack tenant.** A coach at Tony International never sees Lagos Flyers’ athletes, videos, or notes. This is separate from the SolyntaFlow company called GymTrack.
-5. **Adults create accounts. Children do not self-register.** A club admin or coach adds a gymnast. If the gymnast is under 18, a parent email is required before that gymnast can upload video.
+5. **Kids can self-register.** A child creates a gymnast account with email and password. A club can still add a gymnast from the roster. Before that child can upload a skill video, the account asks for a parent’s email and the parent must accept. App Store and Play review expect an adult on a child’s video upload. Browsing, training records, events, clubs, and Inspo do not wait on that parent.
 6. **Web and phone share one API.** The web app is the club-admin console (roster, billing, exports, setup). The iOS and Android apps are one Expo (React Native) codebase, not two native rewrites and not a WebView of the current site.
-7. **The phone apps cover the gym-floor jobs:** sign in, today’s session, skills, record a skill video, see progress, coach attendance, parent view of linked children, push when a coach approves or returns a video.
-8. **The existing screens and skill list are the head start.** Auth, payments, roster truth, and video storage are rebuilt. Shop, the public community feed, the world meet catalog, YouTube page scraping, client-side role switching, and the unused Gemini package stay out of the first paid version.
+7. **The phone apps cover the gym-floor jobs and the public pages:** sign in, today’s session, skills, record a skill video, see progress, coach attendance, parent view of linked children, Find an Event, Find a Club, Inspo, and a push when a coach approves or returns a video.
+8. **The existing screens and skill list are the head start.** Auth, payments, roster truth, and video storage are rebuilt. The shop, YouTube page scraping, client-side role switching, and the unused Gemini package stay out of the first paid version. Find an Event, Find a Club, and Inspo ship in the first version.
 9. **Curriculum is a training aid owned and reviewed by us.** Marketing does not say “official USAG” or “FIG verified.” The current “FIG / GFN Verified” badge and invented payment references are removed.
 10. **The GitHub repo is made private** before any real athlete, parent, or payment data exists. It is public today.
 
-Prices in naira are set after three conversations with real clubs. The ₦75,000 figure in `src/data/gymManagementData.ts` is a sample club’s fee to families. It is not our subscription price.
+The subscription is **₦1,000 per active student per month**. A club with 40 active students owes ₦40,000 for that month. The ₦75,000 figure in `src/data/gymManagementData.ts` is a sample club’s fee to families. It is not our price.
 
-Suggested bands, amounts left for those conversations:
-
-- **Starter:** up to 40 active gymnasts
-- **Club:** up to 120 active gymnasts
-- **Above that:** a manual agreement
-
-An active gymnast is a roster profile that is not archived. When the club is past due, the office and the apps can still read data. They cannot add athletes, mark attendance, or upload video until the invoice is paid.
+An active student is a roster profile that is not archived. When the club is past due, the office and the apps can still read data. They cannot add athletes, mark attendance, or upload video until the transfer for that month’s headcount lands.
 
 ### How a club payment moves
 
-The club transfers the subscription to GymTrack’s Spend Management NUBAN. SolyntaFlow credits that company wallet and writes a funding transaction for the gross amount. GymTrack’s API matches the sender and the amount to the club, then marks the subscription paid. Seat limits and the past-due lock live in GymTrack. The wallet does not know about gymnasts.
+The club transfers ₦1,000 times its active students to GymTrack’s Spend Management NUBAN. SolyntaFlow credits that company wallet and writes a funding transaction for the gross amount. GymTrack’s API matches the sender and the amount to the club, then marks the subscription paid. The headcount and the past-due lock live in GymTrack. The wallet does not know about gymnasts.
 
-A payout is a Spend Request from that wallet to the father’s bank account. It needs his approval. If the shared Anchor float is short, the wallet can show a balance that cannot be sent until the float is topped up. That is the same rule Academy already hits.
+A payout is a Spend Request from that wallet to the mother’s bank account. It needs her approval. If the shared Anchor float is short, the wallet can show a balance that cannot be sent until the float is topped up. That is the same rule Academy already hits.
 
 ---
 
@@ -69,27 +63,29 @@ What a paying club cannot use:
 
 ## Target product
 
-A head coach signs the club up on the web, pays, and invites coaches. Coaches add groups and gymnasts. Each under-18 gymnast is tied to a parent. Parents and gymnasts install the iOS or Android app. Coaches on the floor use the same app to take attendance and review videos. The office uses the web app for billing, exports, and setup.
+A child can open the site or the app and register. A head coach signs the club up on the web, pays ₦1,000 per active student, and invites coaches. Coaches add groups and gymnasts, and gymnasts who self-registered can join a club with an invite code. A parent is linked before that child uploads a skill video. Parents and gymnasts install the iOS or Android app. Coaches on the floor use the same app to take attendance and review videos. The office uses the web app for billing, exports, and setup. Visitors who are not logged in can open Find an Event, Find a Club, and Inspo.
 
 A skill moves through the statuses already in the code: not completed, in progress, awaiting verification, verified. Verification stores the coach’s name. The gymnast and the linked parent can see it. Another club cannot.
 
 ### Web app, first paid version
 
 - Club owner signup, login, logout, password reset
-- Plan, payment status, seat count
+- Kid and adult registration, login, logout, password reset
+- This month’s bill: active students × ₦1,000, and the transfer status
 - Coach invites
 - Roster, groups, archive a gymnast
 - Attendance history and a CSV export
 - Review evidence that was uploaded from the phone
 - Coach notes, practice focus, meet scores
 - Privacy tools: export a gymnast’s data, delete a gymnast, delete the club
-- The current shop, public community, and world meet list are removed from the nav
+- Find an Event, Find a Club, and Inspo, open to visitors
+- The shop is removed from the nav
 
 ### iOS and Android, first paid version
 
 One Expo app, two store listings.
 
-- Sign in with email and password, or open an invite link
+- Register or sign in with email and password, or open an invite link
 - Gymnast home: level, streak, next session, skills waiting on the coach
 - Skills for the gymnast’s level and apparatus, with the written cues already in the data files
 - Play a curated tutorial, then record or pick a video and upload it
@@ -97,10 +93,23 @@ One Expo app, two store listings.
 - Coach mode: today’s groups, mark present / absent / excused, open the evidence queue
 - Parent mode: switch between linked children, read-only progress, no roster of the rest of the club
 - Push notification when evidence is approved or returned, and a reminder before a session the gymnast is enrolled in
+- Find an Event, Find a Club, and Inspo
 - Profile, log out, change password, delete account (Apple requires this in the app)
 - Works on a current iPhone and on Android 8 and newer
 
-Left out of the phone apps until after the first paying clubs: shop, community feed, world meet catalog, club billing, curriculum editing, and any chatbot.
+Left out of the phone apps until after the first paying clubs: the shop, paying the club bill from the child’s phone, curriculum editing, and any chatbot.
+
+### Find an Event
+
+A public, searchable directory of gymnastics events. The seed is `GYM_EVENTS` in `src/data/gymData.ts`. Search covers name, city, country, and date. Nigeria events are activities a gymnast can go to. International events are ones they can watch online, and each of those shows the stream or broadcast link. **Gymfest 3.0** (`ev_gymfest_3`, 14–15 November 2026, Lagos) stays pinned at the top of the first page, above the search results. Filters do not push it off that first screen.
+
+### Find a Club
+
+A public directory. A visitor shares a location or types a city and sees clubs near that place, nearest first. The seed is `INITIAL_REGISTERED_CLUBS` in `src/data/gymManagementData.ts` (Lagos and Abuja). Clubs that finish signup appear here too. Browsing does not require an account. Joining a club does.
+
+### Inspo
+
+The interactive community. Visitors can read. A signed-in gymnast, parent, or coach can post, comment, and like. The seed behaviour is `src/screens/CommunityScreen.tsx`. A person can report or block a post. There are no private messages in the first version. Posts from one club are visible to the whole community. Roster, videos, and notes stay inside the club.
 
 ---
 
@@ -149,7 +158,7 @@ Owned by a club:
 - `skill_progress` (gymnast, skill, status, verified_by, verified_at)
 - `evidence` (storage key, status, coach feedback)
 - `coach_notes`, `practice_focus`, `meet_results`
-- `subscriptions` (club, band, status, seat limit, period end, SolyntaFlow funding reference)
+- `subscriptions` (club, active student count, amount due at ₦1,000 each, status, period end, SolyntaFlow funding reference)
 - `device_tokens`
 - `audit_log` (who viewed or changed a child’s video, note, or profile)
 
@@ -160,13 +169,13 @@ Owned by a club:
 About one week. Little or no product code.
 
 - Make the GitHub repository private.
-- Write down the buyer, the Nigeria-first market, the four roles, and the seat bands above. Get the owner’s yes.
+- Write down the buyer, the Nigeria-first market, the four roles, kid self-registration, and ₦1,000 per student. Get the owner’s yes.
 - Have someone who knows the source check the Gymfest and USAG wording and the embedded YouTube clips. If a passage or video is not ours to ship, drop it before import. Linking out is safer than embedding when the right is unclear.
 - Draft terms of service, a privacy notice, and a data-processing page the club can sign. Name the purpose: running the club’s training records. Name retention: videos and notes stay until the club or the parent deletes them, or 24 months after the gymnast is archived, whichever comes first.
 - The father opens the Apple Developer membership and the Google Play Console account. The children do not enroll. Budget the Apple annual fee and the Play one-time fee. Both reviews need a real privacy policy URL. The seller name is the father’s legal name, or a CAC business name he owns, not the children’s names and not Solynta Academy.
-- Create the GymTrack company on SolyntaFlow and provision its Spend Management wallet and NUBAN. The father is the only user who can approve a payout. Do not create a marketplace vendor NUBAN for GymTrack. Do not point clubs at the Academy Flutterwave account.
+- Create the GymTrack company on SolyntaFlow and provision its Spend Management wallet and NUBAN. The mother is the only user who can approve a payout. Do not create a marketplace vendor NUBAN for GymTrack. Do not point clubs at the Academy Flutterwave account.
 - Decide the public app name (GymTrack, unless the owner picks another) and reserve it on both stores. The repo can stay `Ava-and-Andrea`.
-- Talk to three clubs. Confirm they will pay for roster, attendance, skill video, and a parent view. Confirm who at the club is the adult signer.
+- Talk to three clubs. Confirm they will pay ₦1,000 per student for roster, attendance, skill video, and a parent view. Confirm who at the club is the adult signer.
 
 **Done when:** the owner has accepted this document’s decisions, the repo is private, both store accounts exist, and the curriculum pass has a keep-or-drop list.
 
@@ -204,7 +213,7 @@ Tests: register, login failure, reset, and the two-club isolation test on a samp
 About three weeks. Web first, API shaped so phase 4 does not invent new resources.
 
 - Invite a coach by email. Invite expires in 7 days.
-- Add, edit, and archive gymnasts. Date of birth is required. Under 18 requires a parent email. The parent invite must be accepted before `POST /api/evidence` succeeds for that gymnast.
+- A child can register without a club. Date of birth is required. A parent email is required only before `POST /api/evidence`. The parent invite must be accepted before that upload succeeds.
 - Groups and a weekly schedule.
 - Attendance: create a session for a group and date, mark each gymnast, correct a mark, list history.
 - Persist coach notes, practice focus, and meet scores that the dashboard already collects.
@@ -212,7 +221,19 @@ About three weeks. Web first, API shaped so phase 4 does not invent new resource
 
 The coach dashboard screens stay. They call the API instead of `addRosterGymnast` writing React state only.
 
-**Done when:** a head coach can add a group, take attendance for a session, and see it after a fresh login on another browser. A parent token cannot open an unlinked gymnast.
+**Done when:** a head coach can add a group, take attendance for a session, and see it after a fresh login on another browser. A child can register with no club. A parent token cannot open an unlinked gymnast.
+
+---
+
+## Public pages — Events, clubs, and Inspo
+
+About two weeks. Starts once registration exists. The web pages and the phone screens use the same API.
+
+- **Find an Event.** Load `GYM_EVENTS`. Search by name, city, country, and date. Split Nigeria events (go there) from international events (watch online, with the broadcast link). Pin Gymfest 3.0 at the top of the first page.
+- **Find a Club.** Load registered clubs. Ask for a city or a device location and sort by distance. A visitor can open a club page without an account.
+- **Inspo.** Posts, comments, and likes for signed-in users. Visitors can read. Report and block are required before this ships. No private messages.
+
+**Done when:** a logged-out visitor can find Gymfest 3.0 first, find a Lagos club from a Lagos location, read Inspo, and only a signed-in user can post.
 
 ---
 
@@ -247,7 +268,7 @@ About six to eight weeks. Start the app shell in the last week of phase 1 so nav
 
 ### Screens
 
-Match the phone list in “Target product.” Tab bar for the gymnast: Home, Skills, Progress, Profile. A coach sees Attendance and Review in place of the gymnast home. A parent sees Children, then the same progress view.
+Match the phone list in “Target product.” Tab bar for the gymnast: Home, Skills, Progress, Profile. Events, Clubs, and Inspo are in the same app. A coach sees Attendance and Review in place of the gymnast home. A parent sees Children, then the same progress view.
 
 Build these as new screens. Do not port `GymDashboardScreen.tsx` (about 76 KB) or `SkillsScreen.tsx` (about 56 KB) line for line. Use their behavior as the spec: filters, evidence states, notes, practice focus.
 
@@ -287,12 +308,12 @@ Gymnasts are often children. Even for a Nigeria-first launch, App Store and Play
 
 About two weeks. Can overlap the second half of phase 4.
 
-- GymTrack shows the club its amount and the Spend Management account number. A funding transaction on that wallet is the only writer of paid status. Match it once, by the SolyntaFlow reference, so a replay does not extend the subscription twice.
-- Onboarding: create the club, choose a band, show the transfer instructions, unlock invites only after the matching credit lands.
-- Seat check on “add gymnast.” At the limit, the API returns a clear error the web and the phone both show.
+- GymTrack shows the club the amount, which is active students × ₦1,000, and the Spend Management account number. A funding transaction on that wallet is the only writer of paid status. Match it once, by the SolyntaFlow reference, so a replay does not extend the subscription twice. The amount must match that month’s bill.
+- Onboarding: create the club, show this month’s bill and the transfer instructions, unlock invites only after the matching credit lands.
+- Adding a student raises next month’s bill by ₦1,000. It does not block the add.
 - Past due: read remains, writes stop, both clients show a banner. The club admin banner shows the account number and the amount due. The gymnast app says the club office needs to renew.
 - Email a receipt that names GymTrack and the transfer reference.
-- A test payout is one approved Spend Request to the father’s account. Confirm the GymTrack wallet drops by that amount and Academy’s wallet does not.
+- A test payout is one approved Spend Request to the mother’s account. Confirm the GymTrack wallet drops by that amount and Academy’s wallet does not.
 - Delete the fake card, transfer, and USSD flow in `src/screens/ClubsScreen.tsx`, and the auto-verify path in `registerClub`.
 
 **Done when:** a test transfer to the GymTrack NUBAN unlocks invites, the same transfer replayed does not unlock them twice, a missed renewal blocks a new gymnast and a video upload, a second transfer allows them again, and an approved payout debits the GymTrack Spend Management wallet only.
@@ -325,7 +346,7 @@ Store submission, both platforms:
 
 Pilot:
 
-- Two clubs, on the paid Starter band, real athletes, for four weeks
+- Two clubs, each paying ₦1,000 per active student, for four weeks
 - They take attendance each training day and verify at least ten skill videos
 - Each club has at least one parent on a personal phone
 - A founder watches the error log and sits with one coach in week one
