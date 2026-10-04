@@ -1,0 +1,6 @@
+{
+  "name": "GymTrack",
+  "description": "GymTrack - Gymnastics Training & Progress App for USAG Levels 1–10. Train. Improve. Level Up.",
+  "requestFramePermissions": ["camera", "microphone"],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
