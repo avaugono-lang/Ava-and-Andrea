@@ -221,7 +221,7 @@ export const EventsScreen: React.FC = () => {
       </div>
 
       {/* 2. PROMINENT GYMFEST 3.0 FEATURED HERO BANNER (Requirement 10) */}
-      {statusTab === 'UPCOMING' && !searchQuery.trim() && gymfestEvent && (
+      {statusTab === 'UPCOMING' && gymfestEvent && (
         <section className="relative rounded-3xl overflow-hidden shadow-[0_12px_32px_rgba(244,114,182,0.22)] border-2 border-[#ec4899] bg-[#1f1619] text-white">
           <div className="relative w-full h-56 sm:h-72 overflow-hidden">
             <img
@@ -434,7 +434,7 @@ export const EventsScreen: React.FC = () => {
           <div className="flex items-center gap-2">
             <span className="text-lg">🌐</span>
             <h2 className="text-lg sm:text-xl font-black text-[#1f1619] tracking-tight">
-              International Events
+              Watch online
             </h2>
           </div>
           <span className="text-xs font-bold text-[#6b555c] bg-gray-100 px-2.5 py-0.5 rounded-full">

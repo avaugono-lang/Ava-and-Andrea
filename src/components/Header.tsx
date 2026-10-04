@@ -20,7 +20,7 @@ import {
 import { NavigationTab } from '../types';
 
 export const Header: React.FC = () => {
-  const { user, currentTab, setCurrentTab, cart, userRole, setUserRole } = useGym();
+  const { user, currentTab, setCurrentTab, cart, userRole } = useGym();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   const getSubtext = () => {
@@ -171,39 +171,7 @@ export const Header: React.FC = () => {
             </button>
           </nav>
 
-          {/* 3. Right: Role Switcher, Cart & Profile Avatar */}
           <div className="flex items-center gap-1.5 sm:gap-2.5 shrink-0">
-            {/* Quick Role Switcher Pill (Gymnast vs Coach) */}
-            <div className="hidden md:flex items-center p-0.5 rounded-full bg-[#fff5f8] border border-[#fce7f3] text-[11px] font-bold">
-              <button
-                type="button"
-                onClick={() => setUserRole('GYMNAST')}
-                className={`px-2.5 py-1 rounded-full transition-all ${
-                  userRole === 'GYMNAST'
-                    ? 'bg-white text-[#db2777] shadow-2xs font-extrabold'
-                    : 'text-[#6b555c] hover:text-[#1f1619]'
-                }`}
-                title="Switch to Athlete View"
-              >
-                Gymnast
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  setUserRole('COACH');
-                  if (currentTab !== 'dashboard') setCurrentTab('dashboard');
-                }}
-                className={`px-2.5 py-1 rounded-full transition-all ${
-                  isCoachOrAdmin
-                    ? 'bg-[#ec4899] text-white shadow-2xs font-extrabold'
-                    : 'text-[#6b555c] hover:text-[#1f1619]'
-                }`}
-                title="Switch to Coach / Club Admin View"
-              >
-                Coach
-              </button>
-            </div>
-
             {/* Quick Level Indicator */}
             <button
               id="btn-header-level-indicator"
@@ -302,38 +270,6 @@ export const Header: React.FC = () => {
                 <span className="px-2 py-0.5 rounded-full bg-[#fef9c3] text-[#854d0e] border border-[#fef08a] text-[10px] font-black">
                   Lvl {user.level}
                 </span>
-              </div>
-
-              {/* Mobile Role Switcher */}
-              <div className="space-y-1">
-                <span className="text-[10px] font-black text-[#6b555c] uppercase tracking-wider block px-1">
-                  Active Account Mode
-                </span>
-                <div className="grid grid-cols-2 p-1 bg-[#fff5f8] rounded-xl border border-[#fce7f3] text-xs font-bold">
-                  <button
-                    onClick={() => setUserRole('GYMNAST')}
-                    className={`py-1.5 rounded-lg transition-all ${
-                      userRole === 'GYMNAST'
-                        ? 'bg-white text-[#db2777] shadow-xs font-black'
-                        : 'text-[#6b555c]'
-                    }`}
-                  >
-                    🤸 Gymnast
-                  </button>
-                  <button
-                    onClick={() => {
-                      setUserRole('COACH');
-                      setCurrentTab('dashboard');
-                    }}
-                    className={`py-1.5 rounded-lg transition-all ${
-                      isCoachOrAdmin
-                        ? 'bg-[#ec4899] text-white shadow-xs font-black'
-                        : 'text-[#6b555c]'
-                    }`}
-                  >
-                    📋 Coach / Admin
-                  </button>
-                </div>
               </div>
 
               {/* Navigation Items Links List */}
