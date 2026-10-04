@@ -16,7 +16,7 @@
 2. **GymTrack is its own SolyntaFlow company, and club payments land in its Spend Management wallet.** SolyntaFlow has one Spend Management wallet per company (`CompanyWallet` on a tenant). A marketplace vendor account is a different wallet and is not used. Create a GymTrack tenant, then provision its wallet and NUBAN with `setup_company_nuban`. Inbound transfers to that NUBAN credit `CompanyWallet.balance` after the ₦200 inbound fee. The Solynta Academy Flutterwave business is not used, and Academy fee income is not credited.
 3. **The mother operates the Spend Management wallet.** She is the only SolyntaFlow user who can approve a payout, and the payout goes to a bank account she controls. The children do not get a login that can move money, and they do not enroll as the Apple or Google seller. The father still opens those store accounts, because the sellers must be adults. The wallet’s Anchor account is created under the existing SolyntaFlow Anchor customer. The Spend Management page has no Withdraw button. A payout leaves only after her approval, and only if the shared Anchor float can cover it. A balance on the wallet screen is not a separate pile of cash.
 4. **One gymnastics club is one GymTrack tenant.** A coach at Tony International never sees Lagos Flyers’ athletes, videos, or notes. This is separate from the SolyntaFlow company called GymTrack.
-5. **Kids can self-register.** A child creates a gymnast account with email and password. A club can still add a gymnast from the roster. Before that child can upload a skill video, the account asks for a parent’s email and the parent must accept. App Store and Play review expect an adult on a child’s video upload. Browsing, training records, events, clubs, and Inspo do not wait on that parent.
+5. **Kids can self-register.** A child creates a gymnast account with email and password. A club can still add a gymnast from the roster. Before that child can upload a skill video or an Inspo video, the account asks for a parent’s email and the parent must accept. App Store and Play review expect an adult on a child’s video upload. Browsing, training records, events, clubs, and Inspo do not wait on that parent.
 6. **Web and phone share one API.** The web app is the club-admin console (roster, billing, exports, setup). The iOS and Android apps are one Expo (React Native) codebase, not two native rewrites and not a WebView of the current site.
 7. **The phone apps cover the gym-floor jobs and the public pages:** sign in, today’s session, skills, record a skill video, see progress, coach attendance, parent view of linked children, Find an Event, Find a Club, Inspo, and a push when a coach approves or returns a video.
 8. **The existing screens and skill list are the head start.** Auth, payments, roster truth, and video storage are rebuilt. The shop, YouTube page scraping, client-side role switching, and the unused Gemini package stay out of the first paid version. Find an Event, Find a Club, and Inspo ship in the first version.
@@ -63,7 +63,7 @@ What a paying club cannot use:
 
 ## Target product
 
-A child can open the site or the app and register. A head coach signs the club up on the web, pays ₦1,000 per active student, and invites coaches. Coaches add groups and gymnasts, and gymnasts who self-registered can join a club with an invite code. A parent is linked before that child uploads a skill video. Parents and gymnasts install the iOS or Android app. Coaches on the floor use the same app to take attendance and review videos. The office uses the web app for billing, exports, and setup. Visitors who are not logged in can open Find an Event, Find a Club, and Inspo.
+A child can open the site or the app and register. A head coach signs the club up on the web, pays ₦1,000 per active student, and invites coaches. Coaches add groups and gymnasts, and gymnasts who self-registered can join a club with an invite code. A parent is linked before that child uploads a skill video or an Inspo video. Parents and gymnasts install the iOS or Android app. Coaches on the floor use the same app to take attendance and review videos. The office uses the web app for billing, exports, and setup. Visitors who are not logged in can open Find an Event, Find a Club, and Inspo.
 
 A skill moves through the statuses already in the code: not completed, in progress, awaiting verification, verified. Verification stores the coach’s name. The gymnast and the linked parent can see it. Another club cannot.
 
@@ -109,7 +109,35 @@ A public directory. A visitor shares a location or types a city and sees clubs n
 
 ### Inspo
 
-The interactive community. Visitors can read. A signed-in gymnast, parent, or coach can post, comment, and like. The seed behaviour is `src/screens/CommunityScreen.tsx`. A person can report or block a post. There are no private messages in the first version. Posts from one club are visible to the whole community. Roster, videos, and notes stay inside the club.
+A scrolling feed of gymnastics videos uploaded by gymnasts. Visitors can watch a public video. A signed-in gymnast posts. If that gymnast is under 18, the parent must already have accepted before the video can be published. Coach skill videos and Inspo videos are separate. Posting to Inspo does not submit the clip for coach verification.
+
+Each post shows the video, the gymnast’s name or username, their club, a caption, and the age or level only when that gymnast turned those on. Age and level are off unless the gymnast opts in. Under the video: Like, Comment, Share, and Save.
+
+A **+ Upload Video** button stays on the page. The gymnast can:
+
+- Record a clip or upload one from the phone
+- Pick the skill and a category. Example: skill Back handspring, level Intermediate, club Solynta Gymnastics Club
+- Tag their club
+- Add hashtags
+- Choose who can see it: everyone, followers, or my club
+
+Browse filters, in this order: All, Floor, Vault, Bars, Beam, Tumbling, Flexibility, Strength, Skills, Training, Competitions, Challenges, Progress. All is the latest public videos. The other filters keep that same order inside one category.
+
+- **Like.** Any signed-in user can like a video they are allowed to see.
+- **Comment.** Comments are for encouragement. The box says so. There is no private message thread. A reported comment is hidden until it is reviewed.
+- **Share.** A public video can be shared inside GymTrack or by an outside link. A followers-only or club-only video can be shared only with people who are allowed to see it.
+- **Save.** The video goes into that user’s Saved Inspo list.
+- **Follow.** A user can follow a gymnast or a club. The feed leads with new videos from accounts they follow.
+
+Notifications, on the phone and in the app:
+
+- Someone liked your video
+- Someone commented
+- Someone followed you
+- Someone replied to your comment
+- Someone you follow uploaded a video
+
+Roster notes, attendance, and coach evidence stay inside the club. They do not appear on Inspo. A person can block another user. A blocked user’s videos disappear from their feed.
 
 ---
 
@@ -161,6 +189,13 @@ Owned by a club:
 - `subscriptions` (club, active student count, amount due at ₦1,000 each, status, period end, SolyntaFlow funding reference)
 - `device_tokens`
 - `audit_log` (who viewed or changed a child’s video, note, or profile)
+
+Inspo, visible according to the post’s audience rather than by club admin rights:
+
+- `inspo_posts` (author, video storage key, caption, skill, category, club tag, hashtags, visibility, show_age, show_level)
+- `inspo_likes`, `inspo_comments`, `inspo_saves`
+- `follows` (follower, and either a user or a club)
+- `notifications` (recipient, kind, post or user it points at, read flag)
 
 ---
 
@@ -227,13 +262,13 @@ The coach dashboard screens stay. They call the API instead of `addRosterGymnast
 
 ## Public pages — Events, clubs, and Inspo
 
-About two weeks. Starts once registration exists. The web pages and the phone screens use the same API.
+About four weeks. Starts once registration exists. The web pages and the phone screens use the same API. Inspo video uses the same private bucket as skill evidence, with a separate post record.
 
 - **Find an Event.** Load `GYM_EVENTS`. Search by name, city, country, and date. Split Nigeria events (go there) from international events (watch online, with the broadcast link). Pin Gymfest 3.0 at the top of the first page.
 - **Find a Club.** Load registered clubs. Ask for a city or a device location and sort by distance. A visitor can open a club page without an account.
-- **Inspo.** Posts, comments, and likes for signed-in users. Visitors can read. Report and block are required before this ships. No private messages.
+- **Inspo.** Build the feed, filters, upload, like, comment, share, save, follow, and the five notifications described under Target product. An under-18 publish waits on the parent accept. A club-only video returns 404 to a user outside that club.
 
-**Done when:** a logged-out visitor can find Gymfest 3.0 first, find a Lagos club from a Lagos location, read Inspo, and only a signed-in user can post.
+**Done when:** a logged-out visitor can find Gymfest 3.0 first, find a Lagos club from a Lagos location, and watch a public Inspo video. A signed-in gymnast can record a Back handspring clip, tag Solynta Gymnastics Club, file it under Floor, and see it in Saved Inspo after they tap Save. A follower gets an upload notification. A second club’s gymnast cannot open a video set to My club.
 
 ---
 
