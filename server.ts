@@ -2,13 +2,12 @@ import express, { Request, Response } from 'express';
 import path from 'path';
 import { createServer as createViteServer } from 'vite';
 import dotenv from 'dotenv';
+import { createApp } from './server/createApp.ts';
 
 dotenv.config();
 
-const app = express();
+const app = createApp();
 const PORT = 3000;
-
-app.use(express.json());
 
 // In-memory cache for search results to preserve API quotas and provide lightning speed
 const searchCache = new Map<string, any>();

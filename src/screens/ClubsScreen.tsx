@@ -28,8 +28,9 @@ import {
 } from 'lucide-react';
 
 export const ClubsScreen: React.FC = () => {
-  const { registeredClubs, registerClub, user, setCurrentTab, setUserRole } = useGym();
+  const { registeredClubs, user, setCurrentTab, setUserRole } = useGym();
   const [searchQuery, setSearchQuery] = useState('');
+  const [nearCity, setNearCity] = useState<string | null>(null);
   const [regionFilter, setRegionFilter] = useState<'ALL' | 'NIGERIA' | 'AFRICA' | 'INTERNATIONAL'>('ALL');
   const [selectedClubForModal, setSelectedClubForModal] = useState<RegisteredClub | null>(null);
 
@@ -81,6 +82,11 @@ export const ClubsScreen: React.FC = () => {
     if (regionFilter === 'INTERNATIONAL') return !['Nigeria', 'South Africa', 'Egypt', 'Kenya', 'Ghana'].includes(club.country);
 
     return true;
+  }).slice().sort((a, b) => {
+    if (!nearCity) return 0;
+    if (a.city.toLowerCase() === nearCity && b.city.toLowerCase() !== nearCity) return -1;
+    if (b.city.toLowerCase() === nearCity && a.city.toLowerCase() !== nearCity) return 1;
+    return 0;
   });
 
   const handleStartRegistration = () => {
@@ -113,35 +119,9 @@ export const ClubsScreen: React.FC = () => {
   };
 
   const handleProcessPayment = () => {
-    setIsProcessingPayment(true);
-
-    setTimeout(() => {
-      const newClub = registerClub({
-        name: clubName.trim(),
-        location: `${city.trim()}, ${country.trim()}`,
-        address: locationAddress.trim(),
-        city: city.trim(),
-        state: state.trim(),
-        country: country.trim(),
-        ownerName: ownerName.trim(),
-        adminRole: adminRole.trim() || 'Club Administrator',
-        email: contactEmail.trim(),
-        phone: contactPhone.trim(),
-        website: website.trim() || undefined,
-        gymnastCountTier,
-        logo: logoUrl,
-        description: description.trim() || `Official registered gymnastics club located in ${city}, training athletes in USAG compulsory and optional routines.`,
-        facilities: facilities.split(',').map((f) => f.trim()).filter(Boolean),
-        programs: programs.split(',').map((p) => p.trim()).filter(Boolean),
-        yearEstablished: Number(yearEstablished) || 2024,
-        registrationFee: registrationFeeAmount,
-        currency: 'NGN',
-      });
-
-      setCompletedClubRegistration(newClub);
-      setIsProcessingPayment(false);
-      setRegStep('CONFIRMATION');
-    }, 1200);
+    setFormError('Student places are created from signup. Each student pays ₦1,000 before the account is active.');
+    setIsProcessingPayment(false);
+    setRegStep('DETAILS');
   };
 
   const handleGoToDashboard = () => {
@@ -189,7 +169,7 @@ export const ClubsScreen: React.FC = () => {
               <ArrowRight className="w-4 h-4 ml-0.5" />
             </button>
             <span className="text-[11px] text-gray-300 text-center sm:text-right">
-              Official registration fee: <strong>₦75,000 / year</strong>
+              Student places are ₦1,000 each, paid at signup
             </span>
           </div>
         </div>
@@ -200,7 +180,28 @@ export const ClubsScreen: React.FC = () => {
         <div className="flex flex-col sm:flex-row gap-2.5">
           <div className="relative flex-1">
             <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" />
-            <input
+            <button
+            type="button"
+            onClick={() => {
+              if (!navigator.geolocation) {
+                setNearCity('lagos');
+                return;
+              }
+              navigator.geolocation.getCurrentPosition(
+                (position) => {
+                  const { latitude, longitude } = position.coords;
+                  const lagos = (latitude - 6.52) ** 2 + (longitude - 3.38) ** 2;
+                  const abuja = (latitude - 9.08) ** 2 + (longitude - 7.4) ** 2;
+                  setNearCity(lagos <= abuja ? 'lagos' : 'abuja');
+                },
+                () => setNearCity('lagos'),
+              );
+            }}
+            className="px-3 py-2 rounded-2xl bg-white border border-[#fce7f3] text-xs font-bold"
+          >
+            {nearCity ? `Near ${nearCity}` : 'Near me'}
+          </button>
+          <input
               type="text"
               id="input-club-directory-search"
               value={searchQuery}

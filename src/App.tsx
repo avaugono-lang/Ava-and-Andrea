@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { GymProvider, useGym } from './context/GymContext';
 import { Header } from './components/Header';
 import { BottomNav } from './components/BottomNav';
@@ -8,18 +8,32 @@ import { HomeScreen } from './screens/HomeScreen';
 import { SkillsScreen } from './screens/SkillsScreen';
 import { ProgressScreen } from './screens/ProgressScreen';
 import { EventsScreen } from './screens/EventsScreen';
-import { CommunityScreen } from './screens/CommunityScreen';
 import { ShopScreen } from './screens/ShopScreen';
 import { ProfileScreen } from './screens/ProfileScreen';
 import { AuthScreen } from './screens/AuthScreen';
+import { InspoScreen } from './screens/InspoScreen';
+import { AddStudentsPanel } from './components/AddStudentsPanel';
 import { ClubsScreen } from './screens/ClubsScreen';
 import { GymDashboardScreen } from './screens/GymDashboardScreen';
 
 const MainApp: React.FC = () => {
-  const { user, currentTab } = useGym();
+  const { user, currentTab, userRole } = useGym();
+  const [guestTab, setGuestTab] = useState<'events' | 'clubs' | 'community' | null>(null);
 
   if (!user.isLoggedIn) {
-    return <AuthScreen />;
+    if (!guestTab) return <AuthScreen onBrowse={setGuestTab} />;
+    return (
+      <div className="min-h-screen bg-[#fff9fb] text-[#1f1619]">
+        <div className="p-4">
+          <button type="button" onClick={() => setGuestTab(null)} className="text-sm font-bold text-[#db2777]">Back to signup</button>
+        </div>
+        <main className="pb-10">
+          {guestTab === 'events' && <EventsScreen />}
+          {guestTab === 'clubs' && <ClubsScreen />}
+          {guestTab === 'community' && <InspoScreen />}
+        </main>
+      </div>
+    );
   }
 
   return (
@@ -34,8 +48,13 @@ const MainApp: React.FC = () => {
         {currentTab === 'progress' && <ProgressScreen />}
         {(currentTab === 'competitions' || currentTab === 'events') && <EventsScreen />}
         {currentTab === 'clubs' && <ClubsScreen />}
-        {currentTab === 'dashboard' && <GymDashboardScreen />}
-        {currentTab === 'community' && <CommunityScreen />}
+        {currentTab === 'dashboard' && (
+          <>
+            {userRole === 'CLUB_ADMIN' && <AddStudentsPanel />}
+            <GymDashboardScreen />
+          </>
+        )}
+        {currentTab === 'community' && <InspoScreen />}
         {currentTab === 'shop' && <ShopScreen />}
         {currentTab === 'profile' && <ProfileScreen />}
       </main>
