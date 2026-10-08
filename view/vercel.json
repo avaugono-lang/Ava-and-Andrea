@@ -1,0 +1,8 @@
+{
+  "rewrites": [
+    {
+      "source": "/(.*)",
+      "destination": "https://gymtrack-479282517877.us-central1.run.app/$1"
+    }
+  ]
+}
