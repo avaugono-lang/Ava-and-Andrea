@@ -4,9 +4,48 @@ export function getToken() {
   return sessionStorage.getItem(TOKEN_KEY);
 }
 
+const STATUS_KEY = 'gymtrack_account_status';
+const DUE_KEY = 'gymtrack_payment_due';
+const DEV_KEY = 'gymtrack_dev_match';
+const UNTIL_KEY = 'gymtrack_access_until';
+
 export function setToken(token: string | null) {
   if (token) sessionStorage.setItem(TOKEN_KEY, token);
   else sessionStorage.removeItem(TOKEN_KEY);
+}
+
+export function setAccess(status: string, payment: PaymentInstructions | null, devMatch = false, periodEnd: string | null = null) {
+  sessionStorage.setItem(STATUS_KEY, status);
+  if (status !== 'paid' && status !== 'active' && payment) sessionStorage.setItem(DUE_KEY, JSON.stringify(payment));
+  else sessionStorage.removeItem(DUE_KEY);
+  sessionStorage.setItem(DEV_KEY, devMatch ? '1' : '0');
+  if (periodEnd) sessionStorage.setItem(UNTIL_KEY, periodEnd);
+  else sessionStorage.removeItem(UNTIL_KEY);
+}
+
+export function readAccess(): { status: string | null; payment: PaymentInstructions | null; devMatch: boolean } {
+  const raw = sessionStorage.getItem(DUE_KEY);
+  let payment: PaymentInstructions | null = null;
+  try {
+    payment = raw ? JSON.parse(raw) as PaymentInstructions : null;
+  } catch {
+    payment = null;
+  }
+  const until = sessionStorage.getItem(UNTIL_KEY);
+  const expired = Boolean(until) && Date.parse(until) <= Date.now();
+  return {
+    status: expired ? 'locked' : sessionStorage.getItem(STATUS_KEY),
+    payment,
+    devMatch: sessionStorage.getItem(DEV_KEY) === '1',
+  };
+}
+
+export function clearAccess() {
+  sessionStorage.removeItem(STATUS_KEY);
+  sessionStorage.removeItem(DUE_KEY);
+  sessionStorage.removeItem(DEV_KEY);
+  sessionStorage.removeItem(UNTIL_KEY);
+  setToken(null);
 }
 
 export interface PaymentInstructions {
@@ -28,6 +67,8 @@ export interface ApiUser {
   clubId: string | null;
   clubName: string | null;
   status: string;
+  access?: 'trial' | 'paid' | 'locked';
+  periodEnd?: string | null;
 }
 
 async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
@@ -49,11 +90,12 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
 
 export const gymApi = {
   registerClub: (input: { clubName: string; city: string; adminName: string; email: string; password: string; phone?: string }) =>
-    request<{ token: string; user: ApiUser }>('/api/auth/register-club', { method: 'POST', body: JSON.stringify(input) }),
+    request<{ token: string; user: ApiUser; payment: PaymentInstructions }>('/api/auth/register-club', { method: 'POST', body: JSON.stringify(input) }),
   signupStudent: (input: { name: string; email: string; password: string; phone?: string; level?: number; dateOfBirth: string }) =>
-    request<{ payment: PaymentInstructions; devMatch: boolean }>('/api/auth/signup-student', { method: 'POST', body: JSON.stringify(input) }),
+    request<{ token: string; user: ApiUser; payment: PaymentInstructions; devMatch: boolean }>('/api/auth/signup-student', { method: 'POST', body: JSON.stringify(input) }),
   login: (email: string, password: string) =>
-    request<{ token: string; user: ApiUser }>('/api/auth/login', { method: 'POST', body: JSON.stringify({ email, password }) }),
+    request<{ token: string; user: ApiUser; payment: PaymentInstructions | null }>('/api/auth/login', { method: 'POST', body: JSON.stringify({ email, password }) }),
+  me: () => request<{ user: ApiUser; payment: PaymentInstructions | null }>('/api/me'),
   addStudents: (students: { name: string; email: string; password: string; dateOfBirth: string; level?: number }[]) =>
     request<{ payment: PaymentInstructions; devMatch: boolean }>('/api/clubs/students', { method: 'POST', body: JSON.stringify({ students }) }),
   devMatch: (reference: string, amount: number) =>

@@ -9,7 +9,7 @@ CREATE TABLE IF NOT EXISTS app_state (
 );
 `;
 
-export async function openPostgresStore(connectionString: string) {
+export async function openPostgresStore(connectionString: string, now: () => Date = () => new Date()) {
   const pool = new Pool({ connectionString, max: 5 });
   await pool.query(SCHEMA);
   const found = await pool.query('SELECT doc FROM app_state WHERE id = 1');
@@ -22,5 +22,5 @@ export async function openPostgresStore(connectionString: string) {
        ON CONFLICT (id) DO UPDATE SET doc = EXCLUDED.doc, updated_at = now()`,
       [JSON.stringify(snapshot)],
     );
-  });
+  }, now);
 }

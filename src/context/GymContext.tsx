@@ -335,6 +335,11 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const logoutUser = () => {
     if (typeof window !== 'undefined') {
       sessionStorage.removeItem('gymtrack_session_authed');
+      sessionStorage.removeItem('gymtrack_api_token');
+      sessionStorage.removeItem('gymtrack_account_status');
+      sessionStorage.removeItem('gymtrack_payment_due');
+      sessionStorage.removeItem('gymtrack_dev_match');
+      sessionStorage.removeItem('gymtrack_access_until');
     }
     setUser((prev) => ({
       ...prev,

@@ -36,7 +36,7 @@ export interface UserRecord {
   dateOfBirth: string | null;
   level: number | null;
   clubId: string | null;
-  status: 'pending_payment' | 'active';
+  status: 'pending_payment' | 'trial' | 'active';
   parentAccepted: boolean;
   showAge: boolean;
   showLevel: boolean;
@@ -172,17 +172,21 @@ function haversine(lat1: number, lng1: number, lat2: number, lng2: number) {
   return 2 * r * Math.asin(Math.sqrt(a));
 }
 
-export function openStore(filePath: string) {
+const DAY_MS = 24 * 60 * 60 * 1000;
+const TRIAL_MS = 7 * DAY_MS;
+const MONTH_MS = 30 * DAY_MS;
+
+export function openStore(filePath: string, now: () => Date = () => new Date()) {
   const db: DatabaseShape = fs.existsSync(filePath)
     ? { ...emptyDb(), ...JSON.parse(fs.readFileSync(filePath, 'utf8')) }
     : emptyDb();
   return createBoundStore(db, async (snapshot) => {
     fs.mkdirSync(path.dirname(filePath), { recursive: true });
     fs.writeFileSync(filePath, JSON.stringify(snapshot));
-  });
+  }, now);
 }
 
-export function createBoundStore(db: DatabaseShape, persist: (snapshot: DatabaseShape) => Promise<void>) {
+export function createBoundStore(db: DatabaseShape, persist: (snapshot: DatabaseShape) => Promise<void>, now: () => Date = () => new Date()) {
   async function save() {
     await persist(db);
   }
@@ -201,6 +205,7 @@ export function createBoundStore(db: DatabaseShape, persist: (snapshot: Database
       clubName: club?.name ?? null,
       status: user.status,
       periodEnd: user.periodEnd,
+      access: accessOpen(user) ? (user.status === 'active' ? 'paid' : 'trial') : 'locked',
       age: user.showAge ? age : null,
       showLevel: user.showLevel,
       under18: age !== null && age < 18,
@@ -234,6 +239,20 @@ export function createBoundStore(db: DatabaseShape, persist: (snapshot: Database
     };
   }
 
+  function paymentFor(user: UserRecord) {
+    const payment = db.payments.find((item) => item.status === 'pending' && item.studentIds.includes(user.id));
+    return payment ? paymentView(payment) : null;
+  }
+
+  function accessOpen(user: UserRecord) {
+    return Boolean(user.periodEnd && new Date(user.periodEnd).getTime() > now().getTime());
+  }
+
+  function startTrial(user: UserRecord) {
+    user.status = 'trial';
+    user.periodEnd = new Date(now().getTime() + TRIAL_MS).toISOString();
+  }
+
   async function createPendingStudents(
     students: { name: string; email: string; password: string; phone?: string; level?: number; dateOfBirth?: string }[],
     clubId: string | null,
@@ -255,12 +274,13 @@ export function createBoundStore(db: DatabaseShape, persist: (snapshot: Database
         dateOfBirth: student.dateOfBirth || null,
         level: student.level ?? 1,
         clubId,
-        status: 'pending_payment',
+        status: 'trial',
         parentAccepted: false,
         showAge: false,
         showLevel: false,
         periodEnd: null,
       };
+      startTrial(user);
       db.users.push(user);
       created.push(user);
     }
@@ -344,21 +364,34 @@ export function createBoundStore(db: DatabaseShape, persist: (snapshot: Database
         dateOfBirth: null,
         level: null,
         clubId: club.id,
-        status: 'active',
+        status: 'trial',
         parentAccepted: true,
         showAge: false,
         showLevel: false,
         periodEnd: null,
       };
+      startTrial(admin);
       club.adminUserId = admin.id;
+      const payment: PaymentRecord = {
+        reference: `GT-${randomBytes(3).toString('hex').toUpperCase()}`,
+        amount: MONTHLY_FEE_NGN,
+        studentIds: [admin.id],
+        status: 'pending',
+        transferId: null,
+        clubId: club.id,
+      };
       db.clubs.push(club);
       db.users.push(admin);
+      db.payments.push(payment);
       await save();
-      return { token: await issueToken(admin.id), user: publicUser(admin), club };
+      return { token: await issueToken(admin.id), user: publicUser(admin), club, payment: paymentView(payment) };
     },
 
     async signupStudent(input: { name: string; email: string; password: string; phone?: string; level?: number; dateOfBirth?: string }) {
-      return createPendingStudents([input], null);
+      const created = await createPendingStudents([input], null);
+      const record = db.users.find((item) => item.id === created.students[0]?.id);
+      if (!record) throw new Error('ERROR');
+      return { ...created, token: await issueToken(record.id), user: publicUser(record) };
     },
 
     async signupClubStudents(
@@ -378,12 +411,13 @@ export function createBoundStore(db: DatabaseShape, persist: (snapshot: Database
       if (db.payments.some((item) => item.transferId === transferId)) throw new Error('REPLAY');
       payment.status = 'paid';
       payment.transferId = transferId;
-      const periodEnd = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
       for (const studentId of payment.studentIds) {
         const student = db.users.find((item) => item.id === studentId);
         if (!student) continue;
+        const openUntil = student.periodEnd ? new Date(student.periodEnd).getTime() : 0;
+        const start = Math.max(now().getTime(), openUntil);
         student.status = 'active';
-        student.periodEnd = periodEnd;
+        student.periodEnd = new Date(start + MONTH_MS).toISOString();
         if (payment.clubId) student.clubId = payment.clubId;
       }
       await save();
@@ -402,15 +436,17 @@ export function createBoundStore(db: DatabaseShape, persist: (snapshot: Database
     async login(email: string, password: string) {
       const user = db.users.find((item) => item.email === email.trim().toLowerCase());
       if (!user || !verifyPassword(password, user.passwordHash)) throw new Error('INVALID');
-      if (user.status !== 'active') {
-        const payment = db.payments.find((item) => item.status === 'pending' && item.studentIds.includes(user.id));
-        throw Object.assign(new Error('PAYMENT_REQUIRED'), { payment: payment ? paymentView(payment) : null });
-      }
-      return { token: await issueToken(user.id), user: publicUser(user) };
+      return {
+        token: await issueToken(user.id),
+        user: publicUser(user),
+        payment: user.status === 'active' ? null : paymentFor(user),
+      };
     },
 
     userByToken,
     publicUser,
+    paymentFor,
+    accessOpen,
 
     async acceptParent(studentId: string, parentEmail: string) {
       const student = db.users.find((item) => item.id === studentId);
@@ -484,7 +520,7 @@ export function createBoundStore(db: DatabaseShape, persist: (snapshot: Database
         showLevel?: boolean;
       },
     ) {
-      if (author.status !== 'active') throw new Error('PAYMENT_REQUIRED');
+      if (!accessOpen(author)) throw new Error('PAYMENT_REQUIRED');
       const age = ageYears(author.dateOfBirth);
       if (age !== null && age < 18 && !author.parentAccepted) throw new Error('PARENT_REQUIRED');
       const category = String(input.category);

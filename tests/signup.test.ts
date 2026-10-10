@@ -5,10 +5,12 @@ import test from 'node:test';
 import { createApp } from '../server/createApp.ts';
 
 async function start() {
+  let now = new Date('2026-10-10T12:00:00Z');
   const app = await createApp({
     dbPath: `data/test-${Date.now()}-${Math.random()}.json`,
     webhookSecret: 'test-secret',
     devMatch: false,
+    now: () => now,
   });
   const server = app.listen(0);
   await once(server, 'listening');
@@ -16,6 +18,9 @@ async function start() {
   return {
     server,
     base: `http://127.0.0.1:${port}`,
+    advance(days: number) {
+      now = new Date(now.getTime() + days * 24 * 60 * 60 * 1000);
+    },
   };
 }
 
@@ -24,7 +29,7 @@ async function json(response: Response) {
 }
 
 test('club signup allocates paid students and a direct signup has no club', async () => {
-  const { server, base } = await start();
+  const { server, base, advance } = await start();
   try {
     const club = await json(await fetch(`${base}/api/auth/register-club`, {
       method: 'POST',
@@ -38,6 +43,10 @@ test('club signup allocates paid students and a direct signup has no club', asyn
       }),
     }));
     assert.equal(club.status, 201);
+    assert.equal(club.body.user.access, 'trial');
+    assert.equal(club.body.payment.amount, 1000);
+    const trialMs = Date.parse(club.body.user.periodEnd) - Date.parse('2026-10-10T12:00:00Z');
+    assert.ok(trialMs > 6 * 24 * 60 * 60 * 1000 && trialMs < 8 * 24 * 60 * 60 * 1000);
     const token = club.body.token as string;
 
     const batch = await json(await fetch(`${base}/api/clubs/students`, {
@@ -58,8 +67,24 @@ test('club signup allocates paid students and a direct signup has no club', asyn
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ email: 'ava@gym.test', password: 'ava-pass-1' }),
     }));
-    assert.equal(tooSoon.status, 403);
-    assert.equal(tooSoon.body.code, 'PAYMENT_REQUIRED');
+    assert.equal(tooSoon.status, 200);
+    assert.equal(tooSoon.body.user.access, 'trial');
+    assert.equal(tooSoon.body.payment.amount, 2000);
+    const duringTrial = await json(await fetch(`${base}/api/inspo`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', authorization: `Bearer ${tooSoon.body.token}` },
+      body: JSON.stringify({ videoUrl: 'clip.mp4', caption: 'Try', skill: 'Cartwheel', category: 'Floor', visibility: 'everyone' }),
+    }));
+    assert.equal(duringTrial.status, 403);
+    assert.equal(duringTrial.body.code, 'PARENT_REQUIRED');
+    advance(8);
+    const locked = await json(await fetch(`${base}/api/inspo`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', authorization: `Bearer ${tooSoon.body.token}` },
+      body: JSON.stringify({ videoUrl: 'clip.mp4', caption: 'Try', skill: 'Cartwheel', category: 'Floor', visibility: 'everyone' }),
+    }));
+    assert.equal(locked.status, 403);
+    assert.equal(locked.body.code, 'PAYMENT_REQUIRED');
 
     const paid = await json(await fetch(`${base}/api/payments/webhook`, {
       method: 'POST',
@@ -101,6 +126,21 @@ test('club signup allocates paid students and a direct signup has no club', asyn
       }),
     }));
     assert.equal(solo.body.payment.amount, 1000);
+    assert.equal(solo.body.user.access, 'trial');
+    assert.ok(solo.body.token);
+    const kemiEarly = await json(await fetch(`${base}/api/me`, {
+      headers: { authorization: `Bearer ${solo.body.token}` },
+    }));
+    assert.equal(kemiEarly.status, 200);
+    assert.equal(kemiEarly.body.user.clubId, null);
+    assert.equal(kemiEarly.body.user.access, 'trial');
+    advance(8);
+    const kemiLocked = await json(await fetch(`${base}/api/inspo/missing/like`, {
+      method: 'POST',
+      headers: { authorization: `Bearer ${solo.body.token}` },
+    }));
+    assert.equal(kemiLocked.status, 403);
+    assert.equal(kemiLocked.body.code, 'PAYMENT_REQUIRED');
     await fetch(`${base}/api/payments/webhook`, {
       method: 'POST',
       headers: { 'content-type': 'application/json', 'x-gymtrack-webhook-secret': 'test-secret' },
@@ -112,6 +152,7 @@ test('club signup allocates paid students and a direct signup has no club', asyn
       body: JSON.stringify({ email: 'kemi@gym.test', password: 'kemi-pass-1' }),
     }));
     assert.equal(kemi.body.user.clubId, null);
+    assert.equal(kemi.body.user.access, 'paid');
 
     const events = await json(await fetch(`${base}/api/events?q=vault`));
     assert.equal(events.body.featured.id, 'ev_gymfest_3');

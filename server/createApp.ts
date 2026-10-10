@@ -19,19 +19,30 @@ function asyncRoute(handler: (req: AuthedRequest, res: Response) => Promise<void
   };
 }
 
-export async function createApp(options?: { dbPath?: string; databaseUrl?: string; webhookSecret?: string; devMatch?: boolean }) {
+export async function createApp(options?: { dbPath?: string; databaseUrl?: string; webhookSecret?: string; devMatch?: boolean; now?: () => Date }) {
   const dbPath = options?.dbPath || process.env.GYMTRACK_DB || path.join(process.cwd(), 'data', 'gymtrack.json');
   const databaseUrl = options?.databaseUrl ?? (options?.dbPath ? undefined : process.env.DATABASE_URL);
-  const store = databaseUrl ? await openPostgresStore(databaseUrl) : openStore(dbPath);
+  const now = options?.now ?? (() => new Date());
+  const store = databaseUrl ? await openPostgresStore(databaseUrl, now) : openStore(dbPath, now);
   const webhookSecret = options?.webhookSecret ?? process.env.GYMTRACK_WEBHOOK_SECRET ?? 'dev-webhook-secret';
   const devMatch = options?.devMatch ?? (process.env.GYMTRACK_DEV_MATCH !== '0' && process.env.NODE_ENV !== 'production');
   const app = express();
   app.use(express.json({ limit: '1mb' }));
 
-  async function requireUser(req: AuthedRequest, res: Response) {
+  async function requireAccount(req: AuthedRequest, res: Response) {
     const user = await store.userByToken(bearer(req));
-    if (!user || user.status !== 'active') {
+    if (!user) {
       res.status(401).json({ code: 'UNAUTHORIZED' });
+      return null;
+    }
+    return user;
+  }
+
+  async function requirePaid(req: AuthedRequest, res: Response) {
+    const user = await requireAccount(req, res);
+    if (!user) return null;
+    if (!store.accessOpen(user)) {
+      res.status(403).json({ code: 'PAYMENT_REQUIRED', payment: store.paymentFor(user) });
       return null;
     }
     return user;
@@ -85,13 +96,13 @@ export async function createApp(options?: { dbPath?: string; databaseUrl?: strin
   }));
 
   app.get('/api/me', asyncRoute(async (req, res) => {
-    const user = await requireUser(req, res);
+    const user = await requireAccount(req, res);
     if (!user) return;
-    res.json({ user: await store.publicUser(user) });
+    res.json({ user: store.publicUser(user), payment: store.paymentFor(user) });
   }));
 
   app.post('/api/clubs/students', asyncRoute(async (req, res) => {
-    const admin = await requireUser(req, res);
+    const admin = await requirePaid(req, res);
     if (!admin) return;
     try {
       const result = await store.signupClubStudents(admin, req.body?.students ?? []);
@@ -104,7 +115,7 @@ export async function createApp(options?: { dbPath?: string; databaseUrl?: strin
   }));
 
   app.post('/api/clubs/allocate', asyncRoute(async (req, res) => {
-    const admin = await requireUser(req, res);
+    const admin = await requirePaid(req, res);
     if (!admin) return;
     try {
       res.json({ student: await store.allocatePaidStudent(admin, req.body?.studentId) });
@@ -176,7 +187,7 @@ export async function createApp(options?: { dbPath?: string; databaseUrl?: strin
   }));
 
   app.post('/api/inspo', asyncRoute(async (req, res) => {
-    const user = await requireUser(req, res);
+    const user = await requirePaid(req, res);
     if (!user) return;
     try {
       res.status(201).json({ post: await store.createPost(user, req.body ?? {}) });
@@ -187,7 +198,7 @@ export async function createApp(options?: { dbPath?: string; databaseUrl?: strin
   }));
 
   app.post('/api/inspo/:id/like', asyncRoute(async (req, res) => {
-    const user = await requireUser(req, res);
+    const user = await requirePaid(req, res);
     if (!user) return;
     try {
       res.json({ post: await store.like(user, req.params.id) });
@@ -197,7 +208,7 @@ export async function createApp(options?: { dbPath?: string; databaseUrl?: strin
   }));
 
   app.post('/api/inspo/:id/comments', asyncRoute(async (req, res) => {
-    const user = await requireUser(req, res);
+    const user = await requirePaid(req, res);
     if (!user) return;
     if (!req.body?.text?.trim()) {
       res.status(400).json({ code: 'MISSING' });
@@ -211,7 +222,7 @@ export async function createApp(options?: { dbPath?: string; databaseUrl?: strin
   }));
 
   app.post('/api/inspo/:id/save', asyncRoute(async (req, res) => {
-    const user = await requireUser(req, res);
+    const user = await requirePaid(req, res);
     if (!user) return;
     try {
       res.json({ post: await store.savePost(user, req.params.id) });
@@ -221,13 +232,13 @@ export async function createApp(options?: { dbPath?: string; databaseUrl?: strin
   }));
 
   app.get('/api/inspo/saved', asyncRoute(async (req, res) => {
-    const user = await requireUser(req, res);
+    const user = await requirePaid(req, res);
     if (!user) return;
     res.json({ posts: await store.savedPosts(user) });
   }));
 
   app.post('/api/follows', asyncRoute(async (req, res) => {
-    const user = await requireUser(req, res);
+    const user = await requirePaid(req, res);
     if (!user) return;
     try {
       res.status(201).json(await store.follow(user, { userId: req.body?.userId, clubId: req.body?.clubId }));
@@ -237,7 +248,7 @@ export async function createApp(options?: { dbPath?: string; databaseUrl?: strin
   }));
 
   app.get('/api/notifications', asyncRoute(async (req, res) => {
-    const user = await requireUser(req, res);
+    const user = await requirePaid(req, res);
     if (!user) return;
     res.json({ notifications: await store.notifications(user) });
   }));

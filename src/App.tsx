@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { GymProvider, useGym } from './context/GymContext';
 import { Header } from './components/Header';
 import { BottomNav } from './components/BottomNav';
@@ -13,12 +13,19 @@ import { ProfileScreen } from './screens/ProfileScreen';
 import { AuthScreen } from './screens/AuthScreen';
 import { InspoScreen } from './screens/InspoScreen';
 import { AddStudentsPanel } from './components/AddStudentsPanel';
+import { PaymentRequired } from './components/PaymentRequired';
+import { readAccess } from './services/gymApi';
 import { ClubsScreen } from './screens/ClubsScreen';
 import { GymDashboardScreen } from './screens/GymDashboardScreen';
 
 const MainApp: React.FC = () => {
-  const { user, currentTab, userRole } = useGym();
+  const { user, currentTab, userRole, logoutUser } = useGym();
   const [guestTab, setGuestTab] = useState<'events' | 'clubs' | 'community' | null>(null);
+  const [paidOpen, setPaidOpen] = useState(false);
+
+  useEffect(() => {
+    setPaidOpen(false);
+  }, [user.email, user.isLoggedIn]);
 
   if (!user.isLoggedIn) {
     if (!guestTab) return <AuthScreen onBrowse={setGuestTab} />;
@@ -34,6 +41,10 @@ const MainApp: React.FC = () => {
         </main>
       </div>
     );
+  }
+
+  if (!paidOpen && (readAccess().status === 'locked' || readAccess().status === 'pending_payment')) {
+    return <PaymentRequired onUnlock={() => setPaidOpen(true)} onLogout={logoutUser} />;
   }
 
   return (

@@ -35,7 +35,7 @@ export const AddStudentsPanel: React.FC = () => {
     <section className="max-w-3xl mx-auto px-4 mb-4">
       <form onSubmit={submit} className="bg-white border border-[#fce7f3] rounded-3xl p-4 space-y-2">
         <h2 className="font-black">Add a student · ₦1,000</h2>
-        <p className="text-xs text-[#6b555c]">The student is allocated to this club only after the transfer matches.</p>
+        <p className="text-xs text-[#6b555c]">Each student gets a 7-day trial. After that, training is ₦1,000 a month.</p>
         <div className="grid sm:grid-cols-2 gap-2">
           <input required value={name} onChange={(e) => setName(e.target.value)} placeholder="Student name" className="rounded-2xl border border-[#fce7f3] px-3 py-2 text-sm" />
           <input required type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="Email" className="rounded-2xl border border-[#fce7f3] px-3 py-2 text-sm" />
