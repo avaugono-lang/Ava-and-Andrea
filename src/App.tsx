@@ -43,7 +43,11 @@ const MainApp: React.FC = () => {
     );
   }
 
-  const needsPayment = !paidOpen && (readAccess().status === 'locked' || readAccess().status === 'pending_payment');
+  const access = readAccess();
+  const needsPayment = !paidOpen && (access.status === 'locked' || access.status === 'pending_payment');
+  const clubTrialLabel = access.until
+    ? new Date(access.until).toLocaleDateString(undefined, { day: 'numeric', month: 'long' })
+    : null;
 
   return (
     <div className="min-h-screen bg-[#fff9fb] text-[#1f1619] flex flex-col font-sans selection:bg-[#fde68a] selection:text-[#db2777]">
@@ -63,6 +67,9 @@ const MainApp: React.FC = () => {
             {currentTab === 'clubs' && <ClubsScreen />}
             {currentTab === 'dashboard' && (
               <>
+                {userRole === 'CLUB_ADMIN' && access.status === 'trial' && clubTrialLabel && (
+                  <p className="max-w-3xl mx-auto px-4 mb-3 text-sm text-[#6b555c]">Your club can use every part of GymTrack until {clubTrialLabel}. Payment starts after this free week.</p>
+                )}
                 {userRole === 'CLUB_ADMIN' && <AddStudentsPanel />}
                 <GymDashboardScreen />
               </>

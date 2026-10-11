@@ -23,7 +23,7 @@ export function setAccess(status: string, payment: PaymentInstructions | null, d
   else sessionStorage.removeItem(UNTIL_KEY);
 }
 
-export function readAccess(): { status: string | null; payment: PaymentInstructions | null; devMatch: boolean } {
+export function readAccess(): { status: string | null; payment: PaymentInstructions | null; devMatch: boolean; until: string | null } {
   const raw = sessionStorage.getItem(DUE_KEY);
   let payment: PaymentInstructions | null = null;
   try {
@@ -37,6 +37,7 @@ export function readAccess(): { status: string | null; payment: PaymentInstructi
     status: expired ? 'locked' : sessionStorage.getItem(STATUS_KEY),
     payment,
     devMatch: sessionStorage.getItem(DEV_KEY) === '1',
+    until,
   };
 }
 

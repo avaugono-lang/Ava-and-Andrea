@@ -49,6 +49,7 @@ export interface ClubRecord {
   city: string;
   country: string;
   adminUserId: string;
+  trialEndsAt?: string | null;
 }
 
 export interface PaymentRecord {
@@ -204,7 +205,8 @@ export function createBoundStore(db: DatabaseShape, persist: (snapshot: Database
       clubId: user.clubId,
       clubName: club?.name ?? null,
       status: user.status,
-      periodEnd: user.periodEnd,
+      periodEnd: accessUntil(user),
+      clubTrialEndsAt: clubTrialEnd(user),
       access: accessOpen(user) ? (user.status === 'active' ? 'paid' : 'trial') : 'locked',
       age: user.showAge ? age : null,
       showLevel: user.showLevel,
@@ -244,8 +246,26 @@ export function createBoundStore(db: DatabaseShape, persist: (snapshot: Database
     return payment ? paymentView(payment) : null;
   }
 
+  function clubFor(user: UserRecord) {
+    return user.clubId ? db.clubs.find((item) => item.id === user.clubId) ?? null : null;
+  }
+
+  function clubTrialEnd(user: UserRecord) {
+    return clubFor(user)?.trialEndsAt ?? null;
+  }
+
+  function accessUntil(user: UserRecord) {
+    const times = [user.periodEnd, clubTrialEnd(user)]
+      .filter((value): value is string => Boolean(value))
+      .map((value) => new Date(value).getTime())
+      .filter((value) => !Number.isNaN(value));
+    if (times.length === 0) return null;
+    return new Date(Math.max(...times)).toISOString();
+  }
+
   function accessOpen(user: UserRecord) {
-    return Boolean(user.periodEnd && new Date(user.periodEnd).getTime() > now().getTime());
+    const until = accessUntil(user);
+    return Boolean(until && new Date(until).getTime() > now().getTime());
   }
 
   function startTrial(user: UserRecord) {
@@ -253,7 +273,29 @@ export function createBoundStore(db: DatabaseShape, persist: (snapshot: Database
     user.periodEnd = new Date(now().getTime() + TRIAL_MS).toISOString();
   }
 
+  async function ensureClubTrial(user: UserRecord) {
+    const club = clubFor(user);
+    if (!club) return;
+    let changed = false;
+    if (!club.trialEndsAt) {
+      const personalOpen = user.role === 'CLUB_ADMIN' && user.periodEnd && new Date(user.periodEnd).getTime() > now().getTime();
+      club.trialEndsAt = personalOpen ? user.periodEnd : new Date(now().getTime() + TRIAL_MS).toISOString();
+      changed = true;
+    }
+    if (user.role === 'CLUB_ADMIN' && user.status !== 'active') {
+      const trialEnd = new Date(club.trialEndsAt).getTime();
+      const personalEnd = user.periodEnd ? new Date(user.periodEnd).getTime() : 0;
+      if (personalEnd < trialEnd) {
+        user.status = 'trial';
+        user.periodEnd = club.trialEndsAt;
+        changed = true;
+      }
+    }
+    if (changed) await save();
+  }
+
   async function ensureTrial(user: UserRecord) {
+    await ensureClubTrial(user);
     if (user.periodEnd) return;
     startTrial(user);
     const waiting = db.payments.some((item) => item.status === 'pending' && item.studentIds.includes(user.id));
@@ -369,6 +411,7 @@ export function createBoundStore(db: DatabaseShape, persist: (snapshot: Database
         city: input.city.trim(),
         country: 'Nigeria',
         adminUserId: '',
+        trialEndsAt: null,
       };
       const admin: UserRecord = {
         id: id('usr'),
@@ -389,6 +432,7 @@ export function createBoundStore(db: DatabaseShape, persist: (snapshot: Database
       };
       startTrial(admin);
       club.adminUserId = admin.id;
+      club.trialEndsAt = admin.periodEnd;
       const payment: PaymentRecord = {
         reference: `GT-${randomBytes(3).toString('hex').toUpperCase()}`,
         amount: MONTHLY_FEE_NGN,

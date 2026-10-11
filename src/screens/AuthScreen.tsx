@@ -103,7 +103,7 @@ export const AuthScreen: React.FC<{ onBrowse: (tab: GuestTab) => void }> = ({ on
           <input required type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="Email" className="w-full rounded-2xl border border-[#fce7f3] px-3 py-2 text-sm" />
           <input required type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Password" className="w-full rounded-2xl border border-[#fce7f3] px-3 py-2 text-sm" />
           {mode === 'student' && <p className="text-xs text-[#6b555c]">You get one free week to explore the app. After that, it is ₦1,000 a month. You are not placed in a club until one adds you.</p>}
-          {mode === 'club' && <p className="text-xs text-[#6b555c]">The club gets one free week to explore. After that, the office is ₦1,000 a month. Each student also gets a free week.</p>}
+          {mode === 'club' && <p className="text-xs text-[#6b555c]">Your club gets 7 days to use every part of GymTrack before you pay. After that, the office is ₦1,000 a month.</p>}
           {error && <p className="text-sm text-red-600">{error}</p>}
           <button disabled={busy} className="w-full py-3 rounded-full bg-[#ec4899] text-white font-bold">{busy ? 'Please wait…' : mode === 'login' ? 'Log in' : 'Continue'}</button>
         </form>

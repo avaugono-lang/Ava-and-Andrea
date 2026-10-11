@@ -48,6 +48,35 @@ test('login opens an account that never received a trial week', async () => {
   assert.ok(days > 6 && days < 8);
 });
 
+test('a club trial keeps a member in the app after their own week is cleared', async () => {
+  const db = emptyDb();
+  const store = createBoundStore(db, async () => {});
+  await store.registerClub({
+    clubName: 'Trial Club',
+    city: 'Lagos',
+    adminName: 'Ada',
+    email: 'ada-club@gym.test',
+    password: 'correct-horse',
+  });
+  const admin = db.users[0];
+  await store.signupClubStudents(admin, [{ name: 'Ava', email: 'ava-club@gym.test', password: 'ava-pass', dateOfBirth: '2014-04-01' }]);
+  const student = db.users.find((item) => item.email === 'ava-club@gym.test');
+  if (!student) throw new Error('missing student');
+  student.periodEnd = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+  const session = await store.login('ava-club@gym.test', 'ava-pass');
+  assert.equal(session.user.access, 'trial');
+  const post = {
+    videoUrl: 'a.mp4',
+    caption: 'hi',
+    skill: 'Cartwheel',
+    category: 'Floor' as const,
+    visibility: 'everyone' as const,
+  };
+  await assert.rejects(() => store.createPost(student, post), /PARENT_REQUIRED/);
+  db.clubs[0].trialEndsAt = new Date(Date.now() - 1000).toISOString();
+  await assert.rejects(() => store.createPost(student, post), /PAYMENT_REQUIRED/);
+});
+
 test('club signup allocates paid students and a direct signup has no club', async () => {
   const { server, base, advance } = await start();
   try {
@@ -65,6 +94,8 @@ test('club signup allocates paid students and a direct signup has no club', asyn
     assert.equal(club.status, 201);
     assert.equal(club.body.user.access, 'trial');
     assert.equal(club.body.payment.amount, 1000);
+    const clubTrialMs = Date.parse(club.body.club.trialEndsAt) - Date.parse('2026-10-10T12:00:00Z');
+    assert.ok(clubTrialMs > 6 * 24 * 60 * 60 * 1000 && clubTrialMs < 8 * 24 * 60 * 60 * 1000);
     const trialMs = Date.parse(club.body.user.periodEnd) - Date.parse('2026-10-10T12:00:00Z');
     assert.ok(trialMs > 6 * 24 * 60 * 60 * 1000 && trialMs < 8 * 24 * 60 * 60 * 1000);
     const token = club.body.token as string;
