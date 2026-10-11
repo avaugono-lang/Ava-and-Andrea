@@ -43,9 +43,7 @@ const MainApp: React.FC = () => {
     );
   }
 
-  if (!paidOpen && (readAccess().status === 'locked' || readAccess().status === 'pending_payment')) {
-    return <PaymentRequired onUnlock={() => setPaidOpen(true)} onLogout={logoutUser} />;
-  }
+  const needsPayment = !paidOpen && (readAccess().status === 'locked' || readAccess().status === 'pending_payment');
 
   return (
     <div className="min-h-screen bg-[#fff9fb] text-[#1f1619] flex flex-col font-sans selection:bg-[#fde68a] selection:text-[#db2777]">
@@ -54,20 +52,26 @@ const MainApp: React.FC = () => {
 
       {/* Main Content Area with Header and Bottom Nav Offset */}
       <main className="flex-1 pt-[80px] sm:pt-[88px] pb-24">
-        {currentTab === 'home' && <HomeScreen />}
-        {currentTab === 'skills' && <SkillsScreen />}
-        {currentTab === 'progress' && <ProgressScreen />}
-        {(currentTab === 'competitions' || currentTab === 'events') && <EventsScreen />}
-        {currentTab === 'clubs' && <ClubsScreen />}
-        {currentTab === 'dashboard' && (
+        {needsPayment && currentTab !== 'profile' ? (
+          <PaymentRequired onUnlock={() => setPaidOpen(true)} onLogout={logoutUser} />
+        ) : (
           <>
-            {userRole === 'CLUB_ADMIN' && <AddStudentsPanel />}
-            <GymDashboardScreen />
+            {currentTab === 'home' && <HomeScreen />}
+            {currentTab === 'skills' && <SkillsScreen />}
+            {currentTab === 'progress' && <ProgressScreen />}
+            {(currentTab === 'competitions' || currentTab === 'events') && <EventsScreen />}
+            {currentTab === 'clubs' && <ClubsScreen />}
+            {currentTab === 'dashboard' && (
+              <>
+                {userRole === 'CLUB_ADMIN' && <AddStudentsPanel />}
+                <GymDashboardScreen />
+              </>
+            )}
+            {currentTab === 'community' && <InspoScreen />}
+            {currentTab === 'shop' && <ShopScreen />}
+            {currentTab === 'profile' && <ProfileScreen />}
           </>
         )}
-        {currentTab === 'community' && <InspoScreen />}
-        {currentTab === 'shop' && <ShopScreen />}
-        {currentTab === 'profile' && <ProfileScreen />}
       </main>
 
       {/* Floating Bottom Navigation */}

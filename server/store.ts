@@ -253,6 +253,23 @@ export function createBoundStore(db: DatabaseShape, persist: (snapshot: Database
     user.periodEnd = new Date(now().getTime() + TRIAL_MS).toISOString();
   }
 
+  async function ensureTrial(user: UserRecord) {
+    if (user.periodEnd) return;
+    startTrial(user);
+    const waiting = db.payments.some((item) => item.status === 'pending' && item.studentIds.includes(user.id));
+    if (!waiting) {
+      db.payments.push({
+        reference: `GT-${randomBytes(3).toString('hex').toUpperCase()}`,
+        amount: MONTHLY_FEE_NGN,
+        studentIds: [user.id],
+        status: 'pending',
+        transferId: null,
+        clubId: user.clubId,
+      });
+    }
+    await save();
+  }
+
   async function createPendingStudents(
     students: { name: string; email: string; password: string; phone?: string; level?: number; dateOfBirth?: string }[],
     clubId: string | null,
@@ -436,10 +453,11 @@ export function createBoundStore(db: DatabaseShape, persist: (snapshot: Database
     async login(email: string, password: string) {
       const user = db.users.find((item) => item.email === email.trim().toLowerCase());
       if (!user || !verifyPassword(password, user.passwordHash)) throw new Error('INVALID');
+      await ensureTrial(user);
       return {
         token: await issueToken(user.id),
         user: publicUser(user),
-        payment: user.status === 'active' ? null : paymentFor(user),
+        payment: paymentFor(user),
       };
     },
 
@@ -447,6 +465,7 @@ export function createBoundStore(db: DatabaseShape, persist: (snapshot: Database
     publicUser,
     paymentFor,
     accessOpen,
+    ensureTrial,
 
     async acceptParent(studentId: string, parentEmail: string) {
       const student = db.users.find((item) => item.id === studentId);

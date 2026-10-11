@@ -10,7 +10,7 @@ export const PaymentRequired: React.FC<{ onUnlock: () => void; onLogout: () => v
   const unlockIfPaid = async () => {
     const me = await gymApi.me();
     setAccess(me.user.access ?? me.user.status, me.payment, access.devMatch, me.user.periodEnd ?? null);
-    if (me.user.status === 'active') onUnlock();
+    if (me.user.access === 'paid' || me.user.access === 'trial' || me.user.status === 'active') onUnlock();
     else setMessage('The transfer has not matched yet.');
   };
 
@@ -41,10 +41,10 @@ export const PaymentRequired: React.FC<{ onUnlock: () => void; onLogout: () => v
   };
 
   return (
-    <div className="min-h-screen bg-[#fff9fb] text-[#1f1619] flex items-center justify-center p-4">
-      <div className="w-full max-w-md bg-white rounded-3xl p-6 border border-[#fce7f3] space-y-4">
-        <h1 className="text-2xl font-black">Your free week has ended</h1>
-        <p className="text-sm text-[#6b555c]">Pay ₦1,000 for the next month to keep using skills, progress, meets, clubs, and Inspo.</p>
+    <div className="p-4">
+      <div className="w-full max-w-md mx-auto bg-white rounded-3xl p-6 border border-[#fce7f3] space-y-4">
+        <h1 className="text-2xl font-black">You're signed in</h1>
+        <p className="text-sm text-[#6b555c]">Your free week has ended. Pay ₦1,000 for the next month to keep using skills, progress, meets, clubs, and Inspo.</p>
         {payment ? (
           <dl className="text-sm space-y-2">
             <div className="flex justify-between"><dt>Amount</dt><dd className="font-bold">₦{payment.amount.toLocaleString()}</dd></div>

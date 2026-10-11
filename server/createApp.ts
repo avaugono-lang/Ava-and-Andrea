@@ -35,6 +35,7 @@ export async function createApp(options?: { dbPath?: string; databaseUrl?: strin
       res.status(401).json({ code: 'UNAUTHORIZED' });
       return null;
     }
+    await store.ensureTrial(user);
     return user;
   }
 

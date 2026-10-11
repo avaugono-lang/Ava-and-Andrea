@@ -3,6 +3,7 @@ import { once } from 'node:events';
 import type { AddressInfo } from 'node:net';
 import test from 'node:test';
 import { createApp } from '../server/createApp.ts';
+import { createBoundStore, emptyDb } from '../server/store.ts';
 
 async function start() {
   let now = new Date('2026-10-10T12:00:00Z');
@@ -27,6 +28,25 @@ async function start() {
 async function json(response: Response) {
   return { status: response.status, body: await response.json() };
 }
+
+test('login opens an account that never received a trial week', async () => {
+  const db = emptyDb();
+  const store = createBoundStore(db, async () => {});
+  await store.registerClub({
+    clubName: 'Old Club',
+    city: 'Lagos',
+    adminName: 'Ada',
+    email: 'ada-old@gym.test',
+    password: 'correct-horse',
+  });
+  const saved = db.users[0];
+  saved.periodEnd = null;
+  saved.status = 'active';
+  const session = await store.login('ada-old@gym.test', 'correct-horse');
+  assert.equal(session.user.access, 'trial');
+  const days = (Date.parse(session.user.periodEnd ?? '') - Date.now()) / (24 * 60 * 60 * 1000);
+  assert.ok(days > 6 && days < 8);
+});
 
 test('club signup allocates paid students and a direct signup has no club', async () => {
   const { server, base, advance } = await start();
