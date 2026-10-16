@@ -107,6 +107,8 @@ export interface DatabaseShape {
   saves: { postId: string; userId: string }[];
   follows: { followerId: string; targetUserId?: string; targetClubId?: string }[];
   notifications: NotificationRecord[];
+  blocks: { blockerId: string; blockedId: string }[];
+  commentReports: { id: string; commentId: string; reporterId: string; createdAt: string }[];
 }
 
 const CITY_COORDS: Record<string, [number, number]> = {
@@ -126,6 +128,8 @@ export function emptyDb(): DatabaseShape {
     saves: [],
     follows: [],
     notifications: [],
+    blocks: [],
+    commentReports: [],
   };
 }
 
@@ -188,6 +192,8 @@ export function openStore(filePath: string, now: () => Date = () => new Date()) 
 }
 
 export function createBoundStore(db: DatabaseShape, persist: (snapshot: DatabaseShape) => Promise<void>, now: () => Date = () => new Date()) {
+  db.blocks = db.blocks ?? [];
+  db.commentReports = db.commentReports ?? [];
   async function save() {
     await persist(db);
   }
@@ -369,7 +375,14 @@ export function createBoundStore(db: DatabaseShape, persist: (snapshot: Database
     });
   }
 
+  function isBlocked(a: string, b: string) {
+    return db.blocks.some(
+      (item) => (item.blockerId === a && item.blockedId === b) || (item.blockerId === b && item.blockedId === a),
+    );
+  }
+
   function canSeePost(viewer: UserRecord | null, post: InspoPost) {
+    if (viewer && viewer.id !== post.authorId && isBlocked(viewer.id, post.authorId)) return false;
     if (post.visibility === 'everyone') return true;
     if (!viewer) return false;
     if (viewer.id === post.authorId) return true;
@@ -385,6 +398,7 @@ export function createBoundStore(db: DatabaseShape, persist: (snapshot: Database
       ...post,
       authorName: author?.name ?? 'Gymnast',
       username: author?.username ?? 'gymnast',
+      clubId: author?.clubId ?? null,
       clubName: post.clubTag || club?.name || null,
       age: post.showAge ? age : null,
       level: post.showLevel ? author?.level ?? null : null,
@@ -610,10 +624,19 @@ export function createBoundStore(db: DatabaseShape, persist: (snapshot: Database
       return presentPost(post, author);
     },
 
-    listPosts(viewer: UserRecord | null, category: string) {
+    listPosts(viewer: UserRecord | null, category: string, options?: { following?: boolean }) {
       return db.posts
         .filter((post) => canSeePost(viewer, post))
         .filter((post) => category === 'All' || !category || post.category === category)
+        .filter((post) => {
+          if (!options?.following || !viewer) return !options?.following;
+          const author = db.users.find((item) => item.id === post.authorId);
+          return db.follows.some(
+            (item) =>
+              item.followerId === viewer.id &&
+              (item.targetUserId === post.authorId || (item.targetClubId && item.targetClubId === author?.clubId)),
+          );
+        })
         .map((post) => presentPost(post, viewer));
     },
 
@@ -631,15 +654,21 @@ export function createBoundStore(db: DatabaseShape, persist: (snapshot: Database
     async comment(user: UserRecord, postId: string, text: string, parentCommentId: string | null) {
       const post = db.posts.find((item) => item.id === postId);
       if (!post || !canSeePost(user, post)) throw new Error('NOT_FOUND');
+      const abusive = /\b(kill yourself|kys|idiot|stupid|hate you|shut up|ugly|dumb)\b/i.test(text);
       const comment: CommentRecord = {
         id: id('cmt'),
         postId,
         authorId: user.id,
         text: text.trim(),
         parentCommentId,
-        hidden: false,
+        hidden: abusive,
         createdAt: new Date().toISOString(),
       };
+      if (abusive) {
+        db.comments.push(comment);
+        await save();
+        throw new Error('HELD');
+      }
       db.comments.push(comment);
       if (parentCommentId) {
         const parent = db.comments.find((item) => item.id === parentCommentId);
@@ -686,6 +715,29 @@ export function createBoundStore(db: DatabaseShape, persist: (snapshot: Database
       return db.notifications
         .filter((item) => item.userId === user.id)
         .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+    },
+
+    async reportComment(user: UserRecord, commentId: string) {
+      const comment = db.comments.find((item) => item.id === commentId);
+      if (!comment) throw new Error('NOT_FOUND');
+      comment.hidden = true;
+      db.commentReports.push({
+        id: id('rpt'),
+        commentId,
+        reporterId: user.id,
+        createdAt: new Date().toISOString(),
+      });
+      await save();
+      return { ok: true };
+    },
+
+    async blockUser(user: UserRecord, blockedId: string) {
+      if (!blockedId || blockedId === user.id) throw new Error('EMPTY');
+      if (!db.blocks.some((item) => item.blockerId === user.id && item.blockedId === blockedId)) {
+        db.blocks.push({ blockerId: user.id, blockedId });
+        await save();
+      }
+      return { ok: true };
     },
   };
 }

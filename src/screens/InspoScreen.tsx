@@ -1,125 +1,233 @@
 import React, { useEffect, useState } from 'react';
 import { gymApi, InspoPost } from '../services/gymApi';
-import { Heart, MessageCircle, Bookmark, Share2, Plus } from 'lucide-react';
 
 const CATEGORIES = ['All', 'Floor', 'Vault', 'Bars', 'Beam', 'Tumbling', 'Flexibility', 'Strength', 'Skills', 'Training', 'Competitions', 'Challenges', 'Progress'];
 
+const EMPTY = {
+  skill: 'Back handspring',
+  category: 'Floor',
+  clubTag: '',
+  caption: '',
+  hashtags: '',
+  visibility: 'everyone',
+  showAge: false,
+  showLevel: false,
+  videoUrl: '',
+  previewUrl: '',
+};
+
 export const InspoScreen: React.FC = () => {
   const [category, setCategory] = useState('All');
+  const [followingOnly, setFollowingOnly] = useState(false);
   const [posts, setPosts] = useState<InspoPost[]>([]);
   const [savedOnly, setSavedOnly] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
   const [open, setOpen] = useState(false);
-  const [draft, setDraft] = useState({
-    skill: 'Back handspring',
-    category: 'Floor',
-    clubTag: 'Solynta Gymnastics Club',
-    caption: '',
-    hashtags: '#handspring',
-    visibility: 'everyone',
-    showAge: false,
-    showLevel: false,
-    videoUrl: '',
-  });
+  const [previewing, setPreviewing] = useState(false);
+  const [notes, setNotes] = useState<{ id: string; kind: string; postId: string | null }[]>([]);
+  const [showNotes, setShowNotes] = useState(false);
+  const [replyTo, setReplyTo] = useState<string | null>(null);
+  const [draft, setDraft] = useState(EMPTY);
 
-  const load = async (next = category, saved = savedOnly) => {
+  const load = async (next = category, saved = savedOnly, following = followingOnly) => {
     if (saved) {
-      const result = await gymApi.saved();
-      setPosts(result.posts);
+      setPosts((await gymApi.saved()).posts);
       return;
     }
-    const result = await gymApi.inspo(next);
-    setPosts(result.posts);
+    setPosts((await gymApi.inspo(next, following)).posts);
   };
 
   useEffect(() => {
     load().catch(() => setPosts([]));
-  }, [category, savedOnly]);
+    gymApi.notifications().then((result) => setNotes(result.notifications)).catch(() => setNotes([]));
+  }, [category, savedOnly, followingOnly]);
+
+  const onFile = (file: File | undefined) => {
+    if (!file) return;
+    if (file.size > 6 * 1024 * 1024) {
+      setNotice('That clip is over 6 MB. Use a shorter clip so it can be stored.');
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = () => {
+      const url = typeof reader.result === 'string' ? reader.result : '';
+      setDraft((prev) => ({ ...prev, videoUrl: url, previewUrl: url }));
+    };
+    reader.readAsDataURL(file);
+  };
 
   const upload = async (event: React.FormEvent) => {
     event.preventDefault();
+    if (!previewing) {
+      setPreviewing(true);
+      return;
+    }
     setNotice(null);
     try {
       await gymApi.createInspo({
         ...draft,
         hashtags: draft.hashtags.split(/\s+/).filter(Boolean),
-        videoUrl: draft.videoUrl || 'recorded-clip.mp4',
+        videoUrl: draft.videoUrl || '',
       });
       setOpen(false);
+      setPreviewing(false);
+      setDraft(EMPTY);
       await load();
     } catch (err) {
       const code = (err as { body?: { code?: string } }).body?.code;
-      setNotice(code === 'PARENT_REQUIRED' ? 'A parent must accept before this video can be published.' : 'Sign in with a paid account to upload.');
+      setNotice(code === 'PARENT_REQUIRED' ? 'A parent must accept before this video can be published.' : 'Sign in to upload.');
     }
   };
 
+  const share = async (post: InspoPost) => {
+    const text = post.visibility === 'everyone'
+      ? `${post.skill} on GymTrack Connect`
+      : `This video is only for ${post.visibility === 'club' ? 'the club' : 'followers'}.`;
+    if (post.visibility !== 'everyone') {
+      setNotice(text);
+      return;
+    }
+    if (navigator.share) {
+      await navigator.share({ title: post.skill, text }).catch(() => undefined);
+      return;
+    }
+    await navigator.clipboard?.writeText(text);
+    setNotice('Share text copied.');
+  };
+
   return (
-    <div className="max-w-2xl mx-auto px-4 pb-16 space-y-4">
-      <div className="flex items-end justify-between">
+    <div className="max-w-2xl mx-auto px-4 sm:px-6 py-6 space-y-5">
+      <div className="flex items-end justify-between gap-3">
         <div>
-          <h1 className="text-3xl font-black">Inspo</h1>
-          <p className="text-xs text-[#6b555c]">Gymnastics videos from gymnasts. Comments are for encouragement.</p>
+          <h1 className="font-display text-3xl text-[#3E1B4A]">Connect</h1>
+          <p className="text-sm text-[#5C4A68]">Gymnastics videos from gymnasts.</p>
         </div>
-        <button type="button" onClick={() => setOpen(true)} className="px-4 py-2 rounded-full bg-[#ec4899] text-white font-bold text-sm flex items-center gap-1">
-          <Plus className="w-4 h-4" /> Upload Video
-        </button>
+        <div className="flex gap-2">
+          <button type="button" onClick={() => setShowNotes((value) => !value)} className="px-3 py-2 rounded-full border border-[#E4D7EE] text-sm">
+            Notifications{notes.length ? ` (${notes.length})` : ''}
+          </button>
+          <button type="button" onClick={() => { setOpen(true); setPreviewing(false); }} className="px-4 py-2 rounded-full bg-[#5C2A6E] text-white text-sm">
+            + Upload Video
+          </button>
+        </div>
       </div>
+
+      {showNotes && (
+        <div className="bg-white border border-[#E4D7EE] rounded-2xl p-4 space-y-2">
+          {notes.length === 0 && <p className="text-sm text-[#5C4A68]">No notifications yet.</p>}
+          {notes.map((item) => (
+            <button key={item.id} type="button" onClick={() => { setSavedOnly(false); setFollowingOnly(false); setCategory('All'); setShowNotes(false); }} className="block text-left text-sm w-full">
+              {item.kind === 'like' && 'Someone liked your video.'}
+              {item.kind === 'comment' && 'Someone commented on your video.'}
+              {item.kind === 'reply' && 'Someone replied to your comment.'}
+              {item.kind === 'follow' && 'Someone followed you.'}
+              {item.kind === 'upload' && 'Someone you follow uploaded a video.'}
+            </button>
+          ))}
+        </div>
+      )}
+
       <div className="flex gap-2 overflow-x-auto pb-1">
         {CATEGORIES.map((item) => (
-          <button key={item} type="button" onClick={() => { setSavedOnly(false); setCategory(item); }} className={`px-3 py-1 rounded-full text-xs font-bold whitespace-nowrap ${category === item && !savedOnly ? 'bg-[#1f1619] text-white' : 'bg-white border border-[#fce7f3]'}`}>
+          <button key={item} type="button" onClick={() => { setSavedOnly(false); setFollowingOnly(false); setCategory(item); }} className={`px-3 py-1 rounded-full text-sm whitespace-nowrap ${category === item && !savedOnly && !followingOnly ? 'bg-[#5C2A6E] text-white' : 'bg-white border border-[#E4D7EE]'}`}>
             {item}
           </button>
         ))}
-        <button type="button" onClick={() => setSavedOnly(true)} className={`px-3 py-1 rounded-full text-xs font-bold ${savedOnly ? 'bg-[#1f1619] text-white' : 'bg-white border border-[#fce7f3]'}`}>Saved</button>
+        <button type="button" onClick={() => { setSavedOnly(false); setFollowingOnly(true); }} className={`px-3 py-1 rounded-full text-sm ${followingOnly ? 'bg-[#5C2A6E] text-white' : 'bg-white border border-[#E4D7EE]'}`}>Following</button>
+        <button type="button" onClick={() => { setFollowingOnly(false); setSavedOnly(true); }} className={`px-3 py-1 rounded-full text-sm ${savedOnly ? 'bg-[#5C2A6E] text-white' : 'bg-white border border-[#E4D7EE]'}`}>Saved Inspo</button>
       </div>
-      {notice && <p className="text-sm text-red-600">{notice}</p>}
+      {notice && <p className="text-sm text-[#3E1B4A]">{notice}</p>}
+      {posts.length === 0 && <p className="text-sm text-[#5C4A68]">No videos in this view yet.</p>}
+
       {posts.map((post) => (
-        <article key={post.id} className="bg-white rounded-3xl border border-[#fce7f3] overflow-hidden">
-          <div className="bg-[#1f1619] text-white aspect-video flex items-center justify-center text-sm">{post.skill}</div>
+        <article key={post.id} className="bg-white rounded-2xl border border-[#E4D7EE] overflow-hidden">
+          {post.videoUrl?.startsWith('data:video') || post.videoUrl?.startsWith('blob:') || /\.(mp4|webm)(\?|$)/i.test(post.videoUrl || '') ? (
+            <video src={post.videoUrl} controls className="w-full aspect-video bg-black" />
+          ) : (
+            <div className="aspect-video bg-[#241628] text-white flex items-center justify-center text-sm px-4 text-center">{post.skill}</div>
+          )}
           <div className="p-4 space-y-2">
-            <p className="font-black">{post.authorName} <span className="font-medium text-[#6b555c]">@{post.username}</span></p>
-            <p className="text-xs text-[#6b555c]">{post.clubName}{post.level ? ` · Level ${post.level}` : ''}{post.age ? ` · Age ${post.age}` : ''}</p>
+            <p className="text-[#241628]">{post.authorName}</p>
+            <p className="text-sm text-[#5C4A68]">
+              {post.clubName || 'Club not shown'}
+              {post.level ? ` · Level ${post.level}` : ''}
+              {post.age ? ` · Age ${post.age}` : ''}
+            </p>
             <p className="text-sm">{post.caption}</p>
-            <p className="text-xs text-[#db2777]">{post.hashtags.join(' ')}</p>
-            <div className="flex gap-3 text-sm">
-              <button type="button" onClick={() => gymApi.like(post.id).then(() => load())} className="flex items-center gap-1"><Heart className="w-4 h-4" /> {post.likes}</button>
-              <span className="flex items-center gap-1"><MessageCircle className="w-4 h-4" /> {post.comments.length}</span>
-              <button type="button" onClick={() => gymApi.save(post.id).then(() => load())} className="flex items-center gap-1"><Bookmark className="w-4 h-4" /> Save</button>
-              <button type="button" onClick={() => navigator.share?.({ title: post.skill, text: post.caption }).catch(() => undefined)} className="flex items-center gap-1"><Share2 className="w-4 h-4" /> Share</button>
-              <button type="button" onClick={() => gymApi.follow(post.authorId).catch(() => undefined)} className="text-xs font-bold">Follow</button>
+            <p className="text-sm text-[#5C2A6E]">{post.skill} · {post.hashtags.join(' ')}</p>
+            <div className="flex flex-wrap gap-3 text-sm">
+              <button type="button" onClick={() => gymApi.like(post.id).then(() => load())}>Like {post.likes}</button>
+              <button type="button" onClick={() => gymApi.save(post.id).then(() => load())}>{post.saved ? 'Saved' : 'Save'}</button>
+              <button type="button" onClick={() => share(post)}>Share</button>
+              <button type="button" onClick={() => gymApi.follow(post.authorId).then(() => load()).catch(() => setNotice('Sign in to follow.'))}>Follow</button>
+              {post.clubId && (
+                <button type="button" onClick={() => gymApi.followClub(post.clubId as string).catch(() => setNotice('Sign in to follow a club.'))}>Follow club</button>
+              )}
+              <button type="button" onClick={() => gymApi.block(post.authorId).then(() => load()).catch(() => setNotice('Sign in to block.'))}>Block</button>
             </div>
             {post.comments.map((comment) => (
-              <p key={comment.id} className="text-sm"><strong>{comment.authorName}: </strong>{comment.text}</p>
+              <div key={comment.id} className="text-sm flex justify-between gap-2">
+                <p><strong>{comment.authorName}: </strong>{comment.text}</p>
+                <span className="shrink-0 space-x-2">
+                  <button type="button" onClick={() => setReplyTo(comment.id)}>Reply</button>
+                  <button type="button" onClick={() => gymApi.reportComment(comment.id).then(() => load()).catch(() => setNotice('Sign in to report.'))}>Report</button>
+                </span>
+              </div>
             ))}
-            <form onSubmit={(event) => { event.preventDefault(); const text = new FormData(event.currentTarget).get('text'); gymApi.comment(post.id, String(text || '')).then(() => load()); event.currentTarget.reset(); }} className="flex gap-2">
-              <input name="text" placeholder="Encourage them" className="flex-1 rounded-full border border-[#fce7f3] px-3 py-1 text-sm" />
-              <button className="text-sm font-bold text-[#db2777]">Comment</button>
+            <form
+              onSubmit={(event) => {
+                event.preventDefault();
+                const text = String(new FormData(event.currentTarget).get('text') || '');
+                gymApi.comment(post.id, text, replyTo).then(() => { setReplyTo(null); return load(); }).catch((err) => {
+                  const code = (err as { body?: { code?: string } }).body?.code;
+                  setNotice(code === 'HELD' ? 'That comment is held for review.' : 'Sign in to comment.');
+                });
+                event.currentTarget.reset();
+              }}
+              className="flex gap-2"
+            >
+              <input name="text" placeholder={replyTo ? 'Write a reply' : 'Encourage them'} className="flex-1 rounded-full border border-[#E4D7EE] px-3 py-2 text-sm" />
+              <button className="text-sm text-[#5C2A6E]">Comment</button>
             </form>
           </div>
         </article>
       ))}
+
       {open && (
-        <form onSubmit={upload} className="fixed inset-0 bg-black/40 flex items-end sm:items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-3xl p-4 w-full max-w-md space-y-2">
-            <h2 className="font-black text-lg">Upload Video</h2>
-            <input value={draft.skill} onChange={(e) => setDraft({ ...draft, skill: e.target.value })} placeholder="Skill" className="w-full rounded-2xl border px-3 py-2 text-sm" />
-            <select value={draft.category} onChange={(e) => setDraft({ ...draft, category: e.target.value })} className="w-full rounded-2xl border px-3 py-2 text-sm">
-              {CATEGORIES.filter((item) => item !== 'All').map((item) => <option key={item}>{item}</option>)}
-            </select>
-            <input value={draft.clubTag} onChange={(e) => setDraft({ ...draft, clubTag: e.target.value })} placeholder="Club" className="w-full rounded-2xl border px-3 py-2 text-sm" />
-            <input value={draft.hashtags} onChange={(e) => setDraft({ ...draft, hashtags: e.target.value })} placeholder="#hashtags" className="w-full rounded-2xl border px-3 py-2 text-sm" />
-            <textarea value={draft.caption} onChange={(e) => setDraft({ ...draft, caption: e.target.value })} placeholder="Caption" className="w-full rounded-2xl border px-3 py-2 text-sm" />
-            <select value={draft.visibility} onChange={(e) => setDraft({ ...draft, visibility: e.target.value })} className="w-full rounded-2xl border px-3 py-2 text-sm">
-              <option value="everyone">Everyone</option>
-              <option value="followers">Followers</option>
-              <option value="club">My club</option>
-            </select>
-            <label className="text-xs flex gap-2"><input type="checkbox" checked={draft.showLevel} onChange={(e) => setDraft({ ...draft, showLevel: e.target.checked })} /> Show level</label>
-            <label className="text-xs flex gap-2"><input type="checkbox" checked={draft.showAge} onChange={(e) => setDraft({ ...draft, showAge: e.target.checked })} /> Show age</label>
-            <input type="file" accept="video/*" capture="environment" onChange={(e) => setDraft({ ...draft, videoUrl: e.target.files?.[0]?.name || '' })} className="text-xs" />
+        <form onSubmit={upload} className="fixed inset-0 bg-[#241628]/40 flex items-end sm:items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-2xl p-4 w-full max-w-md space-y-2 max-h-[90vh] overflow-y-auto">
+            <h2 className="font-display text-2xl text-[#3E1B4A]">{previewing ? 'Preview' : 'Upload Video'}</h2>
+            {draft.previewUrl && <video src={draft.previewUrl} controls className="w-full rounded-xl bg-black" />}
+            {!previewing && (
+              <>
+                <input value={draft.skill} onChange={(e) => setDraft({ ...draft, skill: e.target.value })} placeholder="Skill" className="w-full rounded-xl border border-[#E4D7EE] px-3 py-2 text-sm" />
+                <select value={draft.category} onChange={(e) => setDraft({ ...draft, category: e.target.value })} className="w-full rounded-xl border border-[#E4D7EE] px-3 py-2 text-sm">
+                  {CATEGORIES.filter((item) => item !== 'All').map((item) => <option key={item}>{item}</option>)}
+                </select>
+                <input value={draft.clubTag} onChange={(e) => setDraft({ ...draft, clubTag: e.target.value })} placeholder="Club" className="w-full rounded-xl border border-[#E4D7EE] px-3 py-2 text-sm" />
+                <input value={draft.hashtags} onChange={(e) => setDraft({ ...draft, hashtags: e.target.value })} placeholder="#hashtags" className="w-full rounded-xl border border-[#E4D7EE] px-3 py-2 text-sm" />
+                <textarea value={draft.caption} onChange={(e) => setDraft({ ...draft, caption: e.target.value })} placeholder="Caption" className="w-full rounded-xl border border-[#E4D7EE] px-3 py-2 text-sm" />
+                <select value={draft.visibility} onChange={(e) => setDraft({ ...draft, visibility: e.target.value })} className="w-full rounded-xl border border-[#E4D7EE] px-3 py-2 text-sm">
+                  <option value="everyone">Everyone</option>
+                  <option value="followers">Followers</option>
+                  <option value="club">My club</option>
+                </select>
+                <label className="text-sm flex gap-2"><input type="checkbox" checked={draft.showLevel} onChange={(e) => setDraft({ ...draft, showLevel: e.target.checked })} /> Show level</label>
+                <label className="text-sm flex gap-2"><input type="checkbox" checked={draft.showAge} onChange={(e) => setDraft({ ...draft, showAge: e.target.checked })} /> Show age</label>
+                <input type="file" accept="video/*" capture="environment" onChange={(e) => onFile(e.target.files?.[0])} className="text-sm" />
+              </>
+            )}
+            {previewing && (
+              <div className="text-sm space-y-1">
+                <p>{draft.skill} · {draft.category}</p>
+                <p>{draft.clubTag}</p>
+                <p>{draft.caption}</p>
+                <p>Who can view: {draft.visibility}</p>
+              </div>
+            )}
             <div className="flex gap-2">
-              <button className="flex-1 py-2 rounded-full bg-[#ec4899] text-white font-bold">Post</button>
-              <button type="button" onClick={() => setOpen(false)} className="flex-1 py-2 rounded-full border">Cancel</button>
+              <button type="button" onClick={() => { setOpen(false); setPreviewing(false); }} className="flex-1 py-2 rounded-full border border-[#E4D7EE] text-sm">Close</button>
+              <button className="flex-1 py-2 rounded-full bg-[#5C2A6E] text-white text-sm">{previewing ? 'Publish' : 'Preview'}</button>
             </div>
           </div>
         </form>

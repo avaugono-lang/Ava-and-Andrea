@@ -198,14 +198,14 @@ export const ProfileScreen: React.FC = () => {
           </button>
         </div>
 
-        {/* Quick Links: Gym Dashboard & Registered Clubs */}
+        {/* Quick Links: Club Dashboard & Registered Clubs */}
         <div className="flex items-center gap-2 mt-3 pt-3 border-t border-[#fce7f3] w-full max-w-md justify-center">
           <button
             id="btn-profile-gym-dashboard"
             onClick={() => setCurrentTab('dashboard')}
             className="text-xs font-bold text-[#db2777] hover:underline flex items-center gap-1"
           >
-            <span>📋 Gym Dashboard</span>
+            <span>Club Dashboard</span>
           </button>
           <span className="text-gray-300">•</span>
           <button
@@ -213,7 +213,7 @@ export const ProfileScreen: React.FC = () => {
             onClick={() => setCurrentTab('clubs')}
             className="text-xs font-bold text-[#854d0e] hover:underline flex items-center gap-1"
           >
-            <span>🏛️ Verified Clubs</span>
+            <span>Find a Club</span>
           </button>
         </div>
       </section>
@@ -491,7 +491,7 @@ export const ProfileScreen: React.FC = () => {
             </span>
           </div>
           <p className="text-[11px] text-[#6b555c]">
-            Switch perspective to test the dedicated Gym Dashboard, track event scores, and manage club rosters:
+            Switch perspective to test the dedicated Club Dashboard, track event scores, and manage club rosters:
           </p>
           <div className="grid grid-cols-3 gap-1.5 pt-1">
             <button

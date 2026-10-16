@@ -1,7 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { GymProvider, useGym } from './context/GymContext';
 import { Header } from './components/Header';
-import { BottomNav } from './components/BottomNav';
 import { XpToast } from './components/XpToast';
 import { CelebrationModal } from './components/CelebrationModal';
 import { HomeScreen } from './screens/HomeScreen';
@@ -30,9 +29,12 @@ const MainApp: React.FC = () => {
   if (!user.isLoggedIn) {
     if (!guestTab) return <AuthScreen onBrowse={setGuestTab} />;
     return (
-      <div className="min-h-screen bg-[#fff9fb] text-[#1f1619]">
-        <div className="p-4">
-          <button type="button" onClick={() => setGuestTab(null)} className="text-sm font-bold text-[#db2777]">Back to signup</button>
+      <div className="min-h-screen bg-[#F7F4FB] text-[#241628]">
+        <div className="p-4 flex gap-4 text-sm">
+          <button type="button" onClick={() => setGuestTab(null)} className="text-[#5C2A6E]">Back to signup</button>
+          <button type="button" onClick={() => setGuestTab('events')}>Events</button>
+          <button type="button" onClick={() => setGuestTab('clubs')}>Find a Club</button>
+          <button type="button" onClick={() => setGuestTab('community')}>Connect</button>
         </div>
         <main className="pb-10">
           {guestTab === 'events' && <EventsScreen />}
@@ -50,12 +52,12 @@ const MainApp: React.FC = () => {
     : null;
 
   return (
-    <div className="min-h-screen bg-[#fff9fb] text-[#1f1619] flex flex-col font-sans selection:bg-[#fde68a] selection:text-[#db2777]">
+    <div className="min-h-screen bg-[#F7F4FB] text-[#241628] flex flex-col">
       {/* Top Floating App Bar */}
       <Header />
 
       {/* Main Content Area with Header and Bottom Nav Offset */}
-      <main className="flex-1 pt-[80px] sm:pt-[88px] pb-24">
+      <main className="flex-1 pt-16 pb-10">
         {needsPayment && currentTab !== 'profile' ? (
           <PaymentRequired onUnlock={() => setPaidOpen(true)} onLogout={logoutUser} />
         ) : (
@@ -80,9 +82,6 @@ const MainApp: React.FC = () => {
           </>
         )}
       </main>
-
-      {/* Floating Bottom Navigation */}
-      <BottomNav />
 
       {/* Floating XP Reward Notification Toast */}
       <XpToast />

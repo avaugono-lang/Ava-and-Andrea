@@ -27,7 +27,7 @@ export async function createApp(options?: { dbPath?: string; databaseUrl?: strin
   const webhookSecret = options?.webhookSecret ?? process.env.GYMTRACK_WEBHOOK_SECRET ?? 'dev-webhook-secret';
   const devMatch = options?.devMatch ?? (process.env.GYMTRACK_DEV_MATCH !== '0' && process.env.NODE_ENV !== 'production');
   const app = express();
-  app.use(express.json({ limit: '1mb' }));
+  app.use(express.json({ limit: '8mb' }));
 
   async function requireAccount(req: AuthedRequest, res: Response) {
     const user = await store.userByToken(bearer(req));
@@ -184,7 +184,9 @@ export async function createApp(options?: { dbPath?: string; databaseUrl?: strin
 
   app.get('/api/inspo', asyncRoute(async (req, res) => {
     const viewer = await store.userByToken(bearer(req));
-    res.json({ posts: await store.listPosts(viewer, String(req.query.category ?? 'All')) });
+    res.json({
+      posts: await store.listPosts(viewer, String(req.query.category ?? 'All'), { following: req.query.following === '1' }),
+    });
   }));
 
   app.post('/api/inspo', asyncRoute(async (req, res) => {
@@ -217,7 +219,12 @@ export async function createApp(options?: { dbPath?: string; databaseUrl?: strin
     }
     try {
       res.status(201).json({ post: await store.comment(user, req.params.id, req.body.text, req.body.parentCommentId ?? null) });
-    } catch {
+    } catch (error) {
+      const message = error instanceof Error ? error.message : '';
+      if (message === 'HELD') {
+        res.status(422).json({ code: 'HELD' });
+        return;
+      }
       res.status(404).json({ code: 'NOT_FOUND' });
     }
   }));
@@ -243,6 +250,26 @@ export async function createApp(options?: { dbPath?: string; databaseUrl?: strin
     if (!user) return;
     try {
       res.status(201).json(await store.follow(user, { userId: req.body?.userId, clubId: req.body?.clubId }));
+    } catch {
+      res.status(400).json({ code: 'EMPTY' });
+    }
+  }));
+
+  app.post('/api/comments/:id/report', asyncRoute(async (req, res) => {
+    const user = await requirePaid(req, res);
+    if (!user) return;
+    try {
+      res.json(await store.reportComment(user, req.params.id));
+    } catch {
+      res.status(404).json({ code: 'NOT_FOUND' });
+    }
+  }));
+
+  app.post('/api/blocks', asyncRoute(async (req, res) => {
+    const user = await requirePaid(req, res);
+    if (!user) return;
+    try {
+      res.status(201).json(await store.blockUser(user, String(req.body?.userId ?? '')));
     } catch {
       res.status(400).json({ code: 'EMPTY' });
     }

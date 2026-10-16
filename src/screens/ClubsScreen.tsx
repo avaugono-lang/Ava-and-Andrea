@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useGym } from '../context/GymContext';
 import { RegisteredClub, ClubDirectoryItem } from '../types';
 import { AVAILABLE_GYMNASTICS_CLUBS } from '../data/gymData';
+import { VERIFIED_CLUBS } from '../data/verifiedClubs';
 import { 
   Building2, 
   Search, 
@@ -30,6 +31,7 @@ import {
 export const ClubsScreen: React.FC = () => {
   const { registeredClubs, user, setCurrentTab, setUserRole } = useGym();
   const [searchQuery, setSearchQuery] = useState('');
+  const [cityFilter, setCityFilter] = useState<'All' | 'Lagos' | 'Abuja'>('All');
   const [nearCity, setNearCity] = useState<string | null>(null);
   const [regionFilter, setRegionFilter] = useState<'ALL' | 'NIGERIA' | 'AFRICA' | 'INTERNATIONAL'>('ALL');
   const [selectedClubForModal, setSelectedClubForModal] = useState<RegisteredClub | null>(null);
@@ -132,229 +134,48 @@ export const ClubsScreen: React.FC = () => {
 
   return (
     <div className="flex flex-col w-full max-w-4xl mx-auto px-4 sm:px-6 space-y-6 pt-2 pb-16">
-      {/* 1. HERO HEADER WITH REGISTER CLUB CTA */}
-      <section className="relative rounded-3xl bg-gradient-to-br from-[#1f1619] via-[#2d1b24] to-[#1f1619] p-6 sm:p-8 text-white overflow-hidden shadow-lg border border-[#ec4899]/30">
-        <div className="absolute -top-12 -right-12 w-48 h-48 bg-[#ec4899]/20 rounded-full blur-3xl pointer-events-none" />
-        <div className="absolute -bottom-12 -left-12 w-48 h-48 bg-[#f59e0b]/20 rounded-full blur-3xl pointer-events-none" />
-
-        <div className="relative z-10 flex flex-col sm:flex-row sm:items-center justify-between gap-6">
-          <div className="space-y-2 max-w-xl">
-            <div className="flex items-center gap-2 flex-wrap">
-              <span className="px-3 py-1 rounded-full bg-gradient-to-r from-[#ec4899] to-[#db2777] text-white text-xs font-black uppercase tracking-wider shadow-sm flex items-center gap-1.5">
-                <ShieldCheck className="w-3.5 h-3.5 fill-current" />
-                <span>Verified Clubs Directory</span>
-              </span>
-              <span className="text-xs text-[#fef08a] font-bold bg-white/10 px-3 py-1 rounded-full border border-white/20">
-                2026 Federation Affiliated
-              </span>
-            </div>
-
-            <h1 className="text-2xl sm:text-3xl font-black tracking-tight text-white">
-              Gymnastics Clubs & Gym Management
-            </h1>
-            <p className="text-xs sm:text-sm text-gray-300 leading-relaxed">
-              Explore officially verified gymnastics academies, or register your club to access the coach roster portal, track event scores, review video submissions, and prepare gymnasts for competition.
-            </p>
-          </div>
-
-          {/* Primary Call to Action: Register Your Club Button */}
-          <div className="shrink-0 flex flex-col sm:items-end gap-2">
-            <button
-              id="btn-register-club-hero"
-              onClick={handleStartRegistration}
-              className="py-3.5 px-6 rounded-full bg-gradient-to-r from-[#ec4899] via-[#f472b6] to-[#f59e0b] hover:opacity-95 text-white font-black text-xs sm:text-sm shadow-xl shadow-pink-500/30 flex items-center justify-center gap-2 active:scale-98 transition-all"
-            >
-              <Building2 className="w-4 h-4" />
-              <span>Register Your Club</span>
-              <ArrowRight className="w-4 h-4 ml-0.5" />
-            </button>
-            <span className="text-[11px] text-gray-300 text-center sm:text-right">
-              Student places are ₦1,000 each, paid at signup
-            </span>
-          </div>
-        </div>
-      </section>
-
-      {/* 2. SEARCH & REGION FILTERS */}
-      <div className="space-y-3">
-        <div className="flex flex-col sm:flex-row gap-2.5">
-          <div className="relative flex-1">
-            <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" />
-            <button
-            type="button"
-            onClick={() => {
-              if (!navigator.geolocation) {
-                setNearCity('lagos');
-                return;
-              }
-              navigator.geolocation.getCurrentPosition(
-                (position) => {
-                  const { latitude, longitude } = position.coords;
-                  const lagos = (latitude - 6.52) ** 2 + (longitude - 3.38) ** 2;
-                  const abuja = (latitude - 9.08) ** 2 + (longitude - 7.4) ** 2;
-                  setNearCity(lagos <= abuja ? 'lagos' : 'abuja');
-                },
-                () => setNearCity('lagos'),
-              );
-            }}
-            className="px-3 py-2 rounded-2xl bg-white border border-[#fce7f3] text-xs font-bold"
-          >
-            {nearCity ? `Near ${nearCity}` : 'Near me'}
-          </button>
-          <input
-              type="text"
-              id="input-club-directory-search"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search by club name, city, state, or director..."
-              className="w-full pl-10 pr-9 py-2.5 rounded-2xl bg-white border border-[#fce7f3] text-xs font-semibold focus:ring-2 focus:ring-[#ec4899] focus:outline-none"
-            />
-            {searchQuery && (
-              <button
-                onClick={() => setSearchQuery('')}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            )}
-          </div>
-
-          {/* Region Tabs */}
-          <div className="flex p-1 bg-[#fff5f8] rounded-2xl border border-[#fce7f3] text-xs font-bold shrink-0">
-            {(['ALL', 'NIGERIA', 'AFRICA', 'INTERNATIONAL'] as const).map((r) => (
-              <button
-                key={r}
-                onClick={() => setRegionFilter(r)}
-                className={`py-2 px-3 rounded-xl transition-all ${
-                  regionFilter === r
-                    ? 'bg-white text-[#db2777] shadow-xs font-black'
-                    : 'text-[#6b555c] hover:text-[#1f1619]'
-                }`}
-              >
-                {r === 'ALL' ? 'All Regions' : r === 'NIGERIA' ? '🇳🇬 Nigeria' : r === 'AFRICA' ? '🌍 Africa' : '🌐 Global'}
-              </button>
-            ))}
-          </div>
-        </div>
-      </div>
-
-      {/* 3. REGISTERED & VERIFIED CLUBS SECTION */}
       <section className="space-y-4">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <ShieldCheck className="w-5 h-5 text-[#db2777]" />
-            <h2 className="text-lg sm:text-xl font-black text-[#1f1619] tracking-tight">
-              Registered & Verified Gyms ({filteredRegisteredClubs.length})
-            </h2>
+        <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-3">
+          <div>
+            <h1 className="font-display text-3xl text-[#3E1B4A]">Find a Club</h1>
+            <p className="text-sm text-[#5C4A68] mt-1">Gymnastics clubs in Lagos and Abuja. Blank fields are not filled in.</p>
           </div>
-          <span className="text-[11px] font-extrabold text-emerald-800 bg-emerald-50 border border-emerald-200 px-3 py-0.5 rounded-full flex items-center gap-1">
-            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
-            <span>Accredited SafeSport Facilities</span>
-          </span>
+          <button type="button" onClick={handleStartRegistration} className="px-4 py-2 rounded-full bg-[#5C2A6E] text-white text-sm">Register your club</button>
         </div>
-
-        {filteredRegisteredClubs.length === 0 ? (
-          <div className="p-8 text-center bg-white rounded-3xl border border-[#fce7f3] space-y-3">
-            <Building2 className="w-10 h-10 text-[#f472b6] mx-auto" />
-            <h3 className="text-sm font-bold text-[#1f1619]">No clubs found matching your search</h3>
-            <p className="text-xs text-[#6b555c]">
-              Be the first to register your gymnastics club in this area!
-            </p>
-            <button
-              onClick={handleStartRegistration}
-              className="py-2.5 px-4 rounded-full bg-[#ec4899] text-white text-xs font-bold hover:bg-[#db2777] shadow-xs"
-            >
-              Register Your Club Now
-            </button>
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            {filteredRegisteredClubs.map((club) => (
-              <article
-                key={club.id}
-                id={`card-club-${club.id}`}
-                className="bg-white rounded-3xl border border-[#fce7f3] shadow-xs p-5 flex flex-col justify-between hover:border-pink-300 transition-all hover:shadow-md space-y-4"
-              >
+        <div className="flex flex-wrap gap-2">
+          {(['All', 'Lagos', 'Abuja'] as const).map((city) => (
+            <button key={city} type="button" onClick={() => setCityFilter(city)} className={`px-3 py-1 rounded-full text-sm ${cityFilter === city ? 'bg-[#5C2A6E] text-white' : 'bg-white border border-[#E4D7EE]'}`}>{city}</button>
+          ))}
+        </div>
+        <input value={searchQuery} onChange={(event) => setSearchQuery(event.target.value)} placeholder="Search by name or city" className="w-full rounded-xl border border-[#E4D7EE] px-3 py-2 text-sm" />
+        <div className="space-y-3">
+          {VERIFIED_CLUBS.filter((club) => cityFilter === 'All' || club.city === cityFilter).filter((club) => {
+            const q = searchQuery.trim().toLowerCase();
+            return !q || `${club.name} ${club.city} ${club.address ?? ''} ${club.coach ?? ''}`.toLowerCase().includes(q);
+          }).map((club) => (
+            <article key={club.id} className="bg-white border border-[#E4D7EE] rounded-2xl p-4 space-y-2">
+              <div className="flex items-center gap-3">
+                <div className="w-14 h-14 rounded-xl bg-[#F4EEF8] flex items-center justify-center text-[10px] text-[#5C4A68] text-center px-1 leading-tight">
+                  {club.logo ? <img src={club.logo} alt="" className="w-full h-full object-cover rounded-xl" /> : 'Logo not on file'}
+                </div>
                 <div>
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="flex items-center gap-3">
-                      <div className="w-14 h-14 rounded-2xl overflow-hidden bg-[#fff0f5] border border-[#fce7f3] shrink-0 shadow-2xs">
-                        <img
-                          src={club.logo}
-                          alt={club.name}
-                          className="w-full h-full object-cover"
-                        />
-                      </div>
-
-                      <div>
-                        <div className="flex items-center gap-1.5 flex-wrap">
-                          <h3 className="text-base font-black text-[#1f1619] leading-snug">
-                            {club.name}
-                          </h3>
-                        </div>
-
-                        <div className="flex items-center gap-1.5 text-xs text-[#db2777] font-semibold mt-0.5">
-                          <MapPin className="w-3.5 h-3.5 text-[#ec4899] shrink-0" />
-                          <span>{club.city}, {club.country}</span>
-                        </div>
-                      </div>
-                    </div>
-
-                    <span className="px-2.5 py-1 rounded-full bg-emerald-50 border border-emerald-300 text-emerald-800 text-[10px] font-black shrink-0 flex items-center gap-1 shadow-2xs">
-                      <Check className="w-3 h-3 text-emerald-600 stroke-[3]" />
-                      <span>Verified</span>
-                    </span>
-                  </div>
-
-                  <p className="text-xs text-[#6b555c] line-clamp-2 mt-3 leading-relaxed">
-                    {club.description}
-                  </p>
-
-                  {/* Club Badges / Highlights */}
-                  <div className="mt-3 flex flex-wrap gap-1.5 text-[11px]">
-                    <span className="px-2.5 py-0.5 rounded-md bg-[#fef9c3] text-[#854d0e] border border-[#fef08a] font-bold">
-                      👥 {club.gymnastCountTier}
-                    </span>
-                    <span className="px-2.5 py-0.5 rounded-md bg-[#fff5f8] text-[#db2777] border border-[#fce7f3] font-medium">
-                      Est. {club.yearEstablished}
-                    </span>
-                    <span className="px-2.5 py-0.5 rounded-md bg-gray-50 text-gray-700 border border-gray-200">
-                      Director: {club.ownerName}
-                    </span>
-                  </div>
+                  <h2 className="font-display text-xl text-[#3E1B4A]">{club.name}</h2>
+                  <p className="text-sm text-[#5C4A68]">{club.city}</p>
                 </div>
-
-                {/* Bottom actions */}
-                <div className="pt-2 border-t border-[#fce7f3] flex items-center justify-between gap-2">
-                  <div className="text-[11px] text-[#6b555c]">
-                    <span>Affiliation ID: </span>
-                    <strong className="text-[#1f1619] font-mono">{club.paymentReference}</strong>
-                  </div>
-
-                  <div className="flex items-center gap-1.5">
-                    <button
-                      onClick={() => setSelectedClubForModal(club)}
-                      className="py-2 px-3 rounded-full bg-[#fef9c3] text-[#854d0e] border border-[#fef08a] hover:bg-[#fde047] text-xs font-bold transition-all"
-                    >
-                      View Club Info
-                    </button>
-                    {user.clubName === club.name && (
-                      <button
-                        onClick={() => {
-                          setUserRole('CLUB_ADMIN');
-                          setCurrentTab('dashboard');
-                        }}
-                        className="py-2 px-3 rounded-full bg-[#ec4899] text-white hover:bg-[#db2777] text-xs font-black shadow-xs transition-all"
-                      >
-                        Manage
-                      </button>
-                    )}
-                  </div>
-                </div>
-              </article>
-            ))}
-          </div>
-        )}
+              </div>
+              <p className="text-sm">{club.address ?? 'Address not on file'}</p>
+              <p className="text-sm">{club.phone ? <a href={`tel:${club.phone.split(',')[0].trim()}`}>{club.phone}</a> : 'Telephone not on file'}</p>
+              <p className="text-sm">{club.coach ? `Coach: ${club.coach}` : 'Coach name not on file'}</p>
+              <div className="flex flex-wrap gap-3 text-sm">
+                {club.instagram && <a className="text-[#5C2A6E]" href={club.instagram} target="_blank" rel="noreferrer">Instagram</a>}
+                {club.facebook && <a className="text-[#5C2A6E]" href={club.facebook} target="_blank" rel="noreferrer">Facebook</a>}
+                {club.tiktok && <a className="text-[#5C2A6E]" href={club.tiktok} target="_blank" rel="noreferrer">TikTok</a>}
+                {club.youtube && <a className="text-[#5C2A6E]" href={club.youtube} target="_blank" rel="noreferrer">YouTube</a>}
+              </div>
+              {club.missing.length > 0 && <p className="text-xs text-[#5C4A68]">Still to add: {club.missing.join(', ')}</p>}
+            </article>
+          ))}
+        </div>
       </section>
 
       {/* 4. CLUB REGISTRATION & PAYMENT MODAL */}
@@ -765,7 +586,7 @@ export const ClubsScreen: React.FC = () => {
                 </div>
 
                 <p className="text-xs text-[#6b555c]">
-                  You have been upgraded to <strong>Club Administrator</strong>. You can now access the Gym Dashboard to view gymnasts, add scores, review routine videos, and track performance.
+                  You have been upgraded to <strong>Club Administrator</strong>. You can now open Club Dashboard to review videos, attendance, fees, notices and documents.
                 </p>
 
                 <div className="pt-2 flex flex-col sm:flex-row items-center gap-2">

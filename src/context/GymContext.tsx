@@ -19,6 +19,11 @@ import {
   CompetitionResult,
   CoachNote,
   PracticeFocusArea,
+  AttendanceMark,
+  FeeReminder,
+  TrainingNotice,
+  ClubDocument,
+  AchievementCertificate,
 } from '../types';
 import { 
   INITIAL_USER, 
@@ -74,6 +79,18 @@ interface GymContextType {
   addPracticeFocus: (gymnastId: string, focus: Omit<PracticeFocusArea, 'id' | 'assignedDate'>) => void;
   updatePracticeFocusStatus: (gymnastId: string, focusId: string, status: PracticeFocusArea['status']) => void;
   reviewEvidenceSubmission: (gymnastId: string, submissionId: string, status: 'APPROVED' | 'NEEDS_WORK', coachFeedback: string) => void;
+  attendance: AttendanceMark[];
+  feeReminders: FeeReminder[];
+  notices: TrainingNotice[];
+  documents: ClubDocument[];
+  certificates: AchievementCertificate[];
+  markAttendance: (gymnastId: string, gymnastName: string, date: string, present: boolean) => void;
+  sendFeeReminder: (gymnastName: string, message: string) => void;
+  publishNotice: (title: string, body: string) => void;
+  addDocument: (name: string, dataUrl: string) => void;
+  issueCertificate: (gymnastName: string, level: number, note: string) => void;
+  pendingSkillId: string | null;
+  openSkill: (skillId: string) => void;
 
   // Skills actions
   submitSkillVideo: (skillId: string, videoFileName: string, videoUrl?: string) => void;
@@ -116,6 +133,8 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         return {
           ...parsed,
           role: parsed.role || 'GYMNAST',
+          offersBars: parsed.offersBars !== false,
+          offersBeam: parsed.offersBeam !== false,
           isLoggedIn: sessionAuthed === 'true',
         };
       } catch {
@@ -215,6 +234,23 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   });
 
   const [currentTab, setCurrentTab] = useState<NavigationTab>('home');
+  const [pendingSkillId, setPendingSkillId] = useState<string | null>(null);
+  const [office, setOffice] = useState(() => {
+    const empty = {
+      attendance: [] as AttendanceMark[],
+      feeReminders: [] as FeeReminder[],
+      notices: [] as TrainingNotice[],
+      documents: [] as ClubDocument[],
+      certificates: [] as AchievementCertificate[],
+    };
+    if (typeof window === 'undefined') return empty;
+    try {
+      const saved = localStorage.getItem('gymtrack_office_v1');
+      return saved ? { ...empty, ...JSON.parse(saved) } : empty;
+    } catch {
+      return empty;
+    }
+  });
   const [activeXpToast, setActiveXpToast] = useState<XpToast | null>(null);
   const [celebrationBadge, setCelebrationBadge] = useState<AchievementBadge | null>(null);
 
@@ -254,6 +290,10 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   useEffect(() => {
     localStorage.setItem('gymtrack_roster_gymnasts', JSON.stringify(rosterGymnasts));
   }, [rosterGymnasts]);
+
+  useEffect(() => {
+    localStorage.setItem('gymtrack_office_v1', JSON.stringify(office));
+  }, [office]);
 
   // Award XP with visual toast and level progression check
   const awardXp = (amount: number, reason: string) => {
@@ -510,11 +550,14 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const reviewEvidenceSubmission = (
-    gymnastId: string, 
-    submissionId: string, 
-    status: 'APPROVED' | 'NEEDS_WORK', 
+    gymnastId: string,
+    submissionId: string,
+    status: 'APPROVED' | 'NEEDS_WORK',
     coachFeedback: string
   ) => {
+    const submission = rosterGymnasts
+      .find((gymnast) => gymnast.id === gymnastId)
+      ?.evidenceSubmissions.find((item) => item.id === submissionId);
     setRosterGymnasts((prev) =>
       prev.map((g) => {
         if (g.id !== gymnastId) return g;
@@ -534,7 +577,69 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         };
       })
     );
-    awardXp(50, status === 'APPROVED' ? 'Skill verified & approved! (+XP to athlete)' : 'Feedback sent to gymnast');
+    if (submission) {
+      setSkills((prev) =>
+        prev.map((skill) => {
+          const matches = skill.id === submission.skillId || skill.name === submission.skillName;
+          if (!matches) return skill;
+          if (status === 'APPROVED') {
+            return {
+              ...skill,
+              status: 'VERIFIED',
+              verifiedBy: user.fullName || 'Club',
+              verifiedNote: coachFeedback || 'Approved by the club.',
+            };
+          }
+          return {
+            ...skill,
+            status: 'CHANGES_REQUIRED',
+            verifiedNote: coachFeedback || 'Changes required.',
+          };
+        })
+      );
+    }
+    awardXp(50, status === 'APPROVED' ? 'Skill approved' : 'Feedback sent to the gymnast');
+  };
+
+  const markAttendance = (gymnastId: string, gymnastName: string, date: string, present: boolean) => {
+    setOffice((prev) => {
+      const id = `${gymnastId}-${date}`;
+      const rest = prev.attendance.filter((item) => item.id !== id);
+      return { ...prev, attendance: [{ id, gymnastId, gymnastName, date, present }, ...rest] };
+    });
+  };
+
+  const sendFeeReminder = (gymnastName: string, message: string) => {
+    setOffice((prev) => ({
+      ...prev,
+      feeReminders: [{ id: 'fee_' + Date.now(), gymnastName, message, sentAt: new Date().toISOString() }, ...prev.feeReminders],
+    }));
+  };
+
+  const publishNotice = (title: string, body: string) => {
+    setOffice((prev) => ({
+      ...prev,
+      notices: [{ id: 'note_' + Date.now(), title, body, publishedAt: new Date().toISOString() }, ...prev.notices],
+    }));
+  };
+
+  const addDocument = (name: string, dataUrl: string) => {
+    setOffice((prev) => ({
+      ...prev,
+      documents: [{ id: 'doc_' + Date.now(), name, dataUrl, uploadedAt: new Date().toISOString() }, ...prev.documents],
+    }));
+  };
+
+  const issueCertificate = (gymnastName: string, level: number, note: string) => {
+    setOffice((prev) => ({
+      ...prev,
+      certificates: [{ id: 'cert_' + Date.now(), gymnastName, level, note, issuedAt: new Date().toISOString() }, ...prev.certificates],
+    }));
+  };
+
+  const openSkill = (skillId: string) => {
+    setPendingSkillId(skillId);
+    setCurrentTab('skills');
   };
 
   // Skills actions
@@ -553,30 +658,52 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       })
     );
 
-    // Also link into current user in roster
-    setRosterGymnasts((prev) =>
-      prev.map((g) => {
-        if (g.name === user.fullName || g.id === 'gymnast_01') {
-          const matchingSkill = skills.find((s) => s.id === skillId);
-          return {
-            ...g,
-            evidenceSubmissions: [
-              {
-                id: 'sub_' + Date.now(),
-                skillName: matchingSkill ? matchingSkill.name : 'Routine Skill',
-                submittedDate: 'Just now',
-                videoName: videoFileName,
-                videoPreviewUrl: videoUrl,
-                status: 'AWAITING_REVIEW',
-                coachFeedback: 'Awaiting coach evaluation.',
-              },
-              ...g.evidenceSubmissions,
-            ],
-          };
-        }
-        return g;
-      })
-    );
+    const matchingSkill = skills.find((item) => item.id === skillId);
+    const submission = {
+      id: 'sub_' + Date.now(),
+      skillId,
+      skillName: matchingSkill ? matchingSkill.name : 'Skill',
+      submittedDate: new Date().toLocaleDateString(),
+      videoName: videoFileName,
+      videoPreviewUrl: videoUrl,
+      status: 'AWAITING_REVIEW' as const,
+      coachFeedback: '',
+    };
+    setRosterGymnasts((prev) => {
+      const existing = prev.find((gymnast) => gymnast.name === user.fullName);
+      if (!existing) {
+        return [
+          {
+            id: 'gymnast_' + (user.id || Date.now()),
+            name: user.fullName,
+            level: user.level,
+            avatar: user.avatar,
+            age: 0,
+            clubName: user.clubName,
+            eventsFocus: ['VAULT', 'FLOOR'],
+            completedSkillsCount: 0,
+            totalSkillsCount: skills.filter((item) => item.level === user.level).length,
+            personalBests: {
+              vault: { score: 0, meet: '', date: '' },
+              bars: { score: 0, meet: '', date: '' },
+              beam: { score: 0, meet: '', date: '' },
+              floor: { score: 0, meet: '', date: '' },
+              allAround: { score: 0, meet: '', date: '' },
+            },
+            competitionHistory: [],
+            coachNotes: [],
+            practiceAreas: [],
+            evidenceSubmissions: [submission],
+          },
+          ...prev,
+        ];
+      }
+      return prev.map((gymnast) =>
+        gymnast.name === user.fullName
+          ? { ...gymnast, evidenceSubmissions: [submission, ...gymnast.evidenceSubmissions] }
+          : gymnast
+      );
+    });
 
     awardXp(50, 'Evidence submitted for coach verification! 🎥');
   };
@@ -826,6 +953,18 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         addPracticeFocus,
         updatePracticeFocusStatus,
         reviewEvidenceSubmission,
+        attendance: office.attendance,
+        feeReminders: office.feeReminders,
+        notices: office.notices,
+        documents: office.documents,
+        certificates: office.certificates,
+        markAttendance,
+        sendFeeReminder,
+        publishNotice,
+        addDocument,
+        issueCertificate,
+        pendingSkillId,
+        openSkill,
         activeXpToast,
         celebrationBadge,
         dismissCelebration,

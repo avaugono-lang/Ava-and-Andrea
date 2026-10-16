@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useGym } from '../context/GymContext';
+import { ClubOffice } from '../components/ClubOffice';
 import { RosterGymnast, CompetitionResult, CoachNote, PracticeFocusArea, USAGLevel } from '../types';
 import { 
   Building2, 
@@ -223,6 +224,7 @@ export const GymDashboardScreen: React.FC = () => {
 
   return (
     <div className="flex flex-col w-full max-w-5xl mx-auto px-4 sm:px-6 space-y-6 pt-2 pb-16">
+      <ClubOffice />
       {/* 1. CLUB & COACH DASHBOARD HEADER */}
       <section className="bg-white rounded-3xl p-6 sm:p-7 border border-[#fce7f3] shadow-xs relative overflow-hidden space-y-5">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
@@ -232,18 +234,10 @@ export const GymDashboardScreen: React.FC = () => {
             </div>
 
             <div>
-              <div className="flex items-center gap-2 flex-wrap">
-                <h1 className="text-xl sm:text-2xl font-black text-[#1f1619] tracking-tight">
-                  {currentClubName}
-                </h1>
-                <span className="px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-800 border border-emerald-200 text-[10px] font-black flex items-center gap-1 shadow-2xs">
-                  <ShieldCheck className="w-3 h-3 text-emerald-600" />
-                  <span>Verified Club</span>
-                </span>
-              </div>
-              <p className="text-xs text-[#6b555c] mt-0.5">
-                Head Coach Portal • Roster Management, Event Scores, Video Reviews & Progress Analytics
-              </p>
+              <h1 className="text-xl sm:text-2xl font-black text-[#1f1619] tracking-tight">
+                Club Dashboard
+              </h1>
+              <p className="text-sm text-[#6b555c]">{currentClubName}</p>
             </div>
           </div>
 
@@ -858,23 +852,26 @@ export const GymDashboardScreen: React.FC = () => {
                                         : 'bg-amber-50 text-amber-800 border border-amber-200'
                                     }`}
                                   >
-                                    {isApproved ? 'Approved & Stamped ✓' : 'Awaiting Review ⏳'}
+                                    {isApproved ? 'Approved' : sub.status === 'NEEDS_WORK' ? 'Changes required' : 'Awaiting approval'}
                                   </span>
                                 </div>
                                 <div className="flex items-center gap-2 text-xs text-[#6b555c]">
-                                  <Video className="w-3.5 h-3.5 text-[#ec4899]" />
+                                  <Video className="w-3.5 h-3.5 text-[#5C2A6E]" />
                                   <span className="font-mono text-[11px] truncate max-w-xs">{sub.videoName}</span>
-                                  <span>• Submitted {sub.submittedDate}</span>
+                                  <span>· Submitted {sub.submittedDate}</span>
                                 </div>
+                                {sub.videoPreviewUrl && (
+                                  <video src={sub.videoPreviewUrl} controls className="mt-2 w-full max-h-56 rounded-xl bg-black" />
+                                )}
                               </div>
 
                               {/* Review Action Trigger */}
-                              {isAwaiting && (
+                              {!isApproved && (
                                 <button
                                   onClick={() => setReviewingSubmissionId(sub.id)}
-                                  className="py-2 px-3.5 rounded-full bg-[#ec4899] hover:bg-[#db2777] text-white text-xs font-bold transition-all shadow-xs shrink-0"
+                                  className="py-2 px-3.5 rounded-full bg-[#5C2A6E] text-white text-xs font-bold shrink-0"
                                 >
-                                  Evaluate Video Routine
+                                  View and review
                                 </button>
                               )}
                             </div>
@@ -912,7 +909,7 @@ export const GymDashboardScreen: React.FC = () => {
                                     onClick={() => handleReviewEvidence(sub.id, 'NEEDS_WORK')}
                                     className="py-1.5 px-3.5 rounded-full bg-[#fff0f5] border border-pink-200 text-[#db2777] text-xs font-bold hover:bg-[#fce7f3]"
                                   >
-                                    Needs Drill Practice
+                                    Changes required
                                   </button>
                                   <button
                                     type="button"
@@ -920,7 +917,7 @@ export const GymDashboardScreen: React.FC = () => {
                                     className="py-1.5 px-4 rounded-full bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-black shadow-xs flex items-center gap-1"
                                   >
                                     <Check className="w-3.5 h-3.5" />
-                                    <span>Approve & Verify Skill ✓</span>
+                                    <span>Approve</span>
                                   </button>
                                 </div>
                               </div>

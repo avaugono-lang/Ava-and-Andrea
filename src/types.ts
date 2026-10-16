@@ -4,7 +4,7 @@ export type ApparatusCategory = 'FLOOR' | 'VAULT' | 'BARS' | 'BEAM';
 
 export type XcelTier = 'BRONZE' | 'SILVER' | 'GOLD' | 'PLATINUM' | 'DIAMOND';
 
-export type SkillStatus = 'NOT_COMPLETED' | 'IN_PROGRESS' | 'AWAITING_VERIFICATION' | 'VERIFIED';
+export type SkillStatus = 'NOT_COMPLETED' | 'IN_PROGRESS' | 'AWAITING_VERIFICATION' | 'CHANGES_REQUIRED' | 'VERIFIED';
 
 export interface YouTubeTutorial {
   videoId: string;
@@ -214,6 +214,8 @@ export interface UserProfile {
   skillsMasteredCount: number;
   isLoggedIn: boolean;
   role?: UserRole;
+  offersBars?: boolean;
+  offersBeam?: boolean;
 }
 
 export interface GymClub {
@@ -290,12 +292,50 @@ export interface PracticeFocusArea {
 
 export interface RosterEvidenceSubmission {
   id: string;
+  skillId?: string;
   skillName: string;
   submittedDate: string;
   videoName: string;
   videoPreviewUrl?: string;
   status: 'AWAITING_REVIEW' | 'APPROVED' | 'NEEDS_WORK';
   coachFeedback?: string;
+}
+
+export interface AttendanceMark {
+  id: string;
+  gymnastId: string;
+  gymnastName: string;
+  date: string;
+  present: boolean;
+}
+
+export interface FeeReminder {
+  id: string;
+  gymnastName: string;
+  message: string;
+  sentAt: string;
+}
+
+export interface TrainingNotice {
+  id: string;
+  title: string;
+  body: string;
+  publishedAt: string;
+}
+
+export interface ClubDocument {
+  id: string;
+  name: string;
+  dataUrl: string;
+  uploadedAt: string;
+}
+
+export interface AchievementCertificate {
+  id: string;
+  gymnastName: string;
+  level: number;
+  note: string;
+  issuedAt: string;
 }
 
 export interface RosterGymnast {

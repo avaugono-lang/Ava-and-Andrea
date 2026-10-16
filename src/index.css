@@ -30,7 +30,13 @@
 
 @layer base {
   html, body {
-    font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+    font-family: Outfit, -apple-system, BlinkMacSystemFont, sans-serif;
+    background: #F7F4FB;
+    color: #241628;
+  }
+  h1, h2, h3, .font-display {
+    font-family: Fraunces, Georgia, serif;
+    font-weight: 560;
   }
 }
 

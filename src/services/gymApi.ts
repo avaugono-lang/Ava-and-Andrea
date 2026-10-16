@@ -108,14 +108,19 @@ export const gymApi = {
     request<{ clubs: { id: string; name: string; city: string; km?: number }[] }>(
       `/api/clubs${lat !== undefined && lng !== undefined ? `?lat=${lat}&lng=${lng}` : ''}`,
     ),
-  inspo: (category: string) => request<{ posts: InspoPost[] }>(`/api/inspo?category=${encodeURIComponent(category)}`),
+  inspo: (category: string, following = false) =>
+    request<{ posts: InspoPost[] }>(`/api/inspo?category=${encodeURIComponent(category)}${following ? '&following=1' : ''}`),
   createInspo: (input: Record<string, unknown>) => request<{ post: InspoPost }>('/api/inspo', { method: 'POST', body: JSON.stringify(input) }),
   like: (id: string) => request(`/api/inspo/${id}/like`, { method: 'POST' }),
-  comment: (id: string, text: string) => request(`/api/inspo/${id}/comments`, { method: 'POST', body: JSON.stringify({ text }) }),
+  comment: (id: string, text: string, parentCommentId?: string | null) =>
+    request(`/api/inspo/${id}/comments`, { method: 'POST', body: JSON.stringify({ text, parentCommentId }) }),
   save: (id: string) => request(`/api/inspo/${id}/save`, { method: 'POST' }),
   saved: () => request<{ posts: InspoPost[] }>('/api/inspo/saved'),
   follow: (userId: string) => request('/api/follows', { method: 'POST', body: JSON.stringify({ userId }) }),
-  notifications: () => request<{ notifications: { id: string; kind: string }[] }>('/api/notifications'),
+  followClub: (clubId: string) => request('/api/follows', { method: 'POST', body: JSON.stringify({ clubId }) }),
+  reportComment: (id: string) => request(`/api/comments/${id}/report`, { method: 'POST' }),
+  block: (userId: string) => request('/api/blocks', { method: 'POST', body: JSON.stringify({ userId }) }),
+  notifications: () => request<{ notifications: { id: string; kind: string; postId: string | null }[] }>('/api/notifications'),
 };
 
 export interface InspoPost {
@@ -125,6 +130,7 @@ export interface InspoPost {
   caption: string;
   skill: string;
   category: string;
+  clubId?: string | null;
   clubName: string | null;
   authorName: string;
   username: string;

@@ -110,7 +110,7 @@ export const AuthScreen: React.FC<{ onBrowse: (tab: GuestTab) => void }> = ({ on
         <div className="flex justify-between text-xs font-bold text-[#db2777]">
           <button type="button" onClick={() => onBrowse('events')}>Find an Event</button>
           <button type="button" onClick={() => onBrowse('clubs')}>Find a Club</button>
-          <button type="button" onClick={() => onBrowse('community')}>Inspo</button>
+          <button type="button" onClick={() => onBrowse('community')}>Connect</button>
         </div>
       </div>
     </div>
