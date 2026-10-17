@@ -463,7 +463,7 @@ export async function createApp(options?: { dbPath?: string; databaseUrl?: strin
     contactHits.set(key, recent);
     try {
       const result = await store.submitContact(req.body ?? {});
-      res.status(201).json({ ok: true, emailed: result.emailed });
+      res.status(201).json({ ok: true, emailed: result.emailed, forwarded: result.forwarded });
     } catch (error) {
       fail(res, error);
     }

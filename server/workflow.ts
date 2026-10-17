@@ -76,6 +76,7 @@ export interface ContactRecord {
   message: string;
   createdAt: string;
   emailedAt: string | null;
+  forwardedAt?: string | null;
 }
 
 export interface UploadRecord {
@@ -92,6 +93,8 @@ export interface UploadRecord {
 
 export interface Notifiers {
   mail?: (message: { name: string; phone: string; message: string }) => Promise<void>;
+  /** Files the enquiry as a ticket on GymTrack's SolyntaFlow company. */
+  enquiry?: (message: { name: string; phone: string; message: string }) => Promise<void>;
   whatsapp?: (input: { to: string; gymnastName: string; clubName: string; message: string }) => Promise<{ status: 'sent' | 'failed' | 'not_configured'; detail: string }>;
 }
 
@@ -472,6 +475,17 @@ export function createWorkflow(
       db.contacts.push(record);
       await save();
       let emailed = false;
+      let forwarded = false;
+      if (notifiers.enquiry) {
+        try {
+          await notifiers.enquiry({ name, phone, message });
+          record.forwardedAt = now().toISOString();
+          forwarded = true;
+          await save();
+        } catch (error) {
+          console.error('Contact enquiry could not be filed on SolyntaFlow', error instanceof Error ? error.message : error);
+        }
+      }
       if (notifiers.mail) {
         try {
           await notifiers.mail({ name, phone, message });
@@ -482,18 +496,24 @@ export function createWorkflow(
           console.error('Contact email failed', error instanceof Error ? error.message : error);
         }
       }
-      return { id: record.id, emailed };
+      return { id: record.id, emailed, forwarded };
     },
 
     /** Tries again for enquiries that were saved but could not be emailed. */
     async resendContacts() {
-      if (!notifiers.mail) return 0;
       let sent = 0;
-      for (const item of db.contacts.filter((row) => !row.emailedAt)) {
+      for (const item of db.contacts) {
         try {
-          await notifiers.mail({ name: item.name, phone: item.phone, message: item.message });
-          item.emailedAt = now().toISOString();
-          sent += 1;
+          if (notifiers.enquiry && !item.forwardedAt) {
+            await notifiers.enquiry({ name: item.name, phone: item.phone, message: item.message });
+            item.forwardedAt = now().toISOString();
+            sent += 1;
+          }
+          if (notifiers.mail && !item.emailedAt) {
+            await notifiers.mail({ name: item.name, phone: item.phone, message: item.message });
+            item.emailedAt = now().toISOString();
+            sent += 1;
+          }
         } catch {
           break;
         }

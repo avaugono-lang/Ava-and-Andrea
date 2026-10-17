@@ -1,5 +1,6 @@
 import nodemailer from 'nodemailer';
 import { normalisePhone, type Notifiers } from './workflow.ts';
+import { solyntaflowNotifiers } from './solyntaflow.ts';
 
 /**
  * Real delivery for the contact form (email) and fee reminders (WhatsApp).
@@ -73,6 +74,13 @@ export function defaultNotifiers(env: NodeJS.ProcessEnv = process.env): Notifier
       }
       return { status: 'sent', detail: payload.messages?.[0]?.id ?? 'accepted' };
     };
+  }
+
+  // GymTrack's own SolyntaFlow company takes over enquiries and WhatsApp when it is connected.
+  const soly = solyntaflowNotifiers(env);
+  if (soly) {
+    notifiers.enquiry = soly.enquiry;
+    notifiers.whatsapp = soly.whatsapp;
   }
 
   return notifiers;

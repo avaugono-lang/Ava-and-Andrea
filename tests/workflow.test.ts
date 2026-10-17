@@ -314,3 +314,48 @@ test('connect: a child needs a parent first, then publishing keeps the video and
     t.server.close();
   }
 });
+
+test('SolyntaFlow: enquiries become tickets and fee reminders are sent as ticket replies', async () => {
+  const { solyntaflowNotifiers } = await import('../server/solyntaflow.ts');
+  const seen: { url: string; auth: string | null; body: any }[] = [];
+  let ticketNo = 0;
+  const fake = (async (url: string, init: RequestInit) => {
+    const body = JSON.parse(String(init.body));
+    seen.push({ url, auth: (init.headers as Record<string, string>).authorization, body });
+    if (url.endsWith('/tickets/')) {
+      ticketNo += 1;
+      return new Response(JSON.stringify({ id: ticketNo, ticket_number: `TKT-${ticketNo}` }), { status: 201 });
+    }
+    return new Response(JSON.stringify(body.body.includes('FAIL') ? { delivery_status: 'failed', delivery_error: 'Outside the 24 hour window' } : { delivery_status: 'sent' }), { status: 201 });
+  }) as unknown as typeof fetch;
+
+  assert.equal(solyntaflowNotifiers({} as NodeJS.ProcessEnv, fake), null);
+  const soly = solyntaflowNotifiers({ SOLYNTAFLOW_TOKEN: 'tok', SOLYNTAFLOW_API_URL: 'https://soly.test/' } as unknown as NodeJS.ProcessEnv, fake)!;
+
+  await soly.enquiry!({ name: 'Ada', phone: '0803 111 2222', message: 'Classes?' });
+  assert.equal(seen[0].url, 'https://soly.test/api/customer-service/tickets/');
+  assert.equal(seen[0].auth, 'Token tok');
+  assert.equal(seen[0].body.customer_phone, '0803 111 2222');
+  assert.equal(seen[0].body.description, 'Classes?');
+
+  const ok = await soly.whatsapp!({ to: '2348031234567', gymnastName: 'Ava', clubName: 'Alpha', message: 'Fee due' });
+  assert.equal(ok.status, 'sent');
+  assert.equal(seen[1].body.customer_phone, '+2348031234567');
+  assert.equal(seen[2].url, 'https://soly.test/api/customer-service/messages/');
+  assert.equal(seen[2].body.ticket, 2);
+
+  const bad = await soly.whatsapp!({ to: '2348031234567', gymnastName: 'Ava', clubName: 'Alpha', message: 'FAIL' });
+  assert.equal(bad.status, 'failed');
+  assert.match(bad.detail, /24 hour/);
+
+  // The contact form uses it: the enquiry is saved and filed, with no email needed
+  const filed: string[] = [];
+  const t = await start({ enquiry: async (m) => { filed.push(m.name); } });
+  try {
+    const res = await t.call('POST', '/api/contact', undefined, { name: 'Ada', phone: '0803 111 2222', message: 'Hi' });
+    assert.equal(res.body.forwarded, true);
+    assert.deepEqual(filed, ['Ada']);
+  } finally {
+    t.server.close();
+  }
+});
