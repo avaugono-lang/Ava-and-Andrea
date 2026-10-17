@@ -6,7 +6,7 @@ export const LOGO_SRC = '/gymtrack-logo.png';
 
 export const Logo: React.FC<{ className?: string; size?: 'sm' | 'lg' }> = ({ className = '', size = 'sm' }) => {
   const [failed, setFailed] = useState(false);
-  const height = size === 'lg' ? 'h-24' : 'h-10';
+  const height = size === 'lg' ? 'h-28' : 'h-12';
   if (failed) {
     return (
       <span className={`font-display ${size === 'lg' ? 'text-4xl' : 'text-xl'} text-[#3E1B4A] ${className}`}>
